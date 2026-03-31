@@ -1,0 +1,22 @@
+{
+  "name": "demo-01-simple-task-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "lint": "eslint src --ext .ts"
+  },
+  "dependencies": {
+    "express": "^4.22.1",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.25",
+    "@types/node": "^25.5.0",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.19.0",
+    "typescript": "^5.9.3"
+  }
+}

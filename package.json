@@ -1,0 +1,22 @@
+{
+  "name": "restful-api-design-patterns",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "demo:01": "cd demos/beginner/demo-01-simple-task-api && pnpm dev"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "typescript": "^5.5.0"
+  },
+  "workspaces": [
+    "demos/beginner/demo-*",
+    "demos/intermediate/demo-*",
+    "demos/advanced/demo-*",
+    "demos/real-world/demo-*"
+  ]
+}

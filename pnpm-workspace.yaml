@@ -1,0 +1,5 @@
+packages:
+  - 'demos/beginner/demo-*'
+  - 'demos/intermediate/demo-*'
+  - 'demos/advanced/demo-*'
+  - 'demos/real-world/demo-*'
