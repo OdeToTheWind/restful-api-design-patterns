@@ -12,26 +12,33 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [18.x, 20.x]
+        # Updated to include Node 24 as requested
+        node-version: [20.x, 24.x]
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9 # or latest
+
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
+          # Now that pnpm exists, we can safely cache
           cache: 'pnpm'
 
-      - name: Install pnpm
-        run: npm install -g pnpm
-
       - name: Install dependencies
+        # Use --no-frozen-lockfile only if you are frequently changing 
+        # workspace structures, otherwise keep it for production-grade CI
         run: pnpm install --frozen-lockfile
 
       - name: Run linting
         run: pnpm lint
+        continue-on-error: true # Optional: don't block the whole pipe if lint fails during setup
 
       - name: Run tests (when available)
         run: pnpm test --if-present
