@@ -1,8 +1,7 @@
-import request, { Response } from 'supertest';
+import request from 'supertest';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import Ajv2020 from 'ajv/dist/2020';
-import addFormats from 'ajv-formats';
+import { createContractMatcher } from '@restful/shared/testing';
 import app from '../app';
 import prisma from '../lib/prisma';
 import { config } from '../config';
@@ -24,45 +23,7 @@ jest.mock('../lib/prisma', () => {
   return { __esModule: true, default: client };
 });
 
-type Json = Record<string, unknown>;
-const doc = openApiDocument as unknown as { paths: Record<string, Record<string, Json>>; components: Json };
-
-const components = doc.components as { schemas: Record<string, unknown> };
-
-// Inline local $refs, then close every object schema. allOf branches stay open individually;
-// the allOf node itself is closed, so properties from all branches together are allowed.
-const prepare = (node: unknown, inAllOf = false): unknown => {
-  if (Array.isArray(node)) return node.map((n) => prepare(n, inAllOf));
-  if (typeof node !== 'object' || node === null) return node;
-  const ref = (node as Json).$ref;
-  if (typeof ref === 'string') {
-    return prepare(components.schemas[ref.replace('#/components/schemas/', '')], inAllOf);
-  }
-  const out: Json = {};
-  for (const [key, value] of Object.entries(node)) {
-    out[key] = key === 'allOf' ? (value as unknown[]).map((v) => prepare(v, true)) : prepare(value);
-  }
-  const isObjectSchema = out.type === 'object' || 'allOf' in out;
-  if (isObjectSchema && !inAllOf && !('additionalProperties' in out)) out.unevaluatedProperties = false;
-  return out;
-};
-
-const ajv = new Ajv2020({ strict: false, allErrors: true });
-addFormats(ajv);
-
-const expectToMatchSpec = (res: Response, method: string, path: string) => {
-  const operation = doc.paths[path]?.[method] as { responses: Record<string, Json> } | undefined;
-  expect(operation).toBeDefined();
-  const documented = operation!.responses[String(res.status)];
-  if (!documented) throw new Error(`${method.toUpperCase()} ${path} returned undocumented status ${res.status}`);
-  const schema = (documented.content as Record<string, { schema: unknown }>)['application/json'].schema;
-  const validate = ajv.compile(prepare(schema) as object);
-  if (!validate(res.body)) {
-    throw new Error(
-      `${method.toUpperCase()} ${path} ${res.status} does not match the spec: ${ajv.errorsText(validate.errors)}`,
-    );
-  }
-};
+const expectToMatchSpec = createContractMatcher(openApiDocument);
 
 const now = new Date();
 const dbUser = {

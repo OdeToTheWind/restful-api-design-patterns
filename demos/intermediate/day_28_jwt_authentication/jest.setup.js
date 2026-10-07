@@ -4,3 +4,4 @@ process.env.NODE_ENV = 'test';
 // One limiter is shared by every request in a test file; rate-limit.test.ts lowers this itself
 process.env.AUTH_RATE_LIMIT = '1000';
 process.env.LOGIN_ACCOUNT_LIMIT = '1000';
+process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test';
