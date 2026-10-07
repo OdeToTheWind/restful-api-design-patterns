@@ -15,7 +15,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4 # version comes from "packageManager" in package.json
@@ -52,7 +52,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
