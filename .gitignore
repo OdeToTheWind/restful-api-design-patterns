@@ -1,32 +1,35 @@
-# Dependency directories
+# Dependencies
 node_modules/
-jspm_packages/
-
-# Next.js build output
-.next/
-out/
+.pnpm-store/
 
 # Build outputs
 dist/
 build/
 
-# Environment variables (NEVER COMMIT THESE)
+# Environment variables
 .env
 .env.local
-.env.development.local
-.env.test.local
-.env.production.local
 
-# Debug logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
+# Logs
+*.log
+logs/
 
-# OS Metadata
+# OS
 .DS_Store
 Thumbs.db
 
-# IDE Settings
-.vscode/
-.idea/
+# Editors
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# Temporary files
+*.tmp
+*.temp
+# Generated Prisma clients (one per demo, see prisma/schema.prisma `output`)
+generated/
+coverage/
+
+# Runtime file uploads (Day 21+) — keep the folder, not the files
+demos/**/uploads/*
+!demos/**/uploads/.gitkeep
