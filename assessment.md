@@ -484,29 +484,29 @@ An earlier version of this plan marked Steps 1–4 as "Implemented ✅". A file-
 
 ## 9. Next Steps
 
-Only pending work is listed here. Completed work is recorded in the [issue tracker](#7-identified-flaws--issues--status-tracker) (Section 7).
+Tracked progress for immediate tasks and upcoming curriculum milestones:
 
-#### 🔴 Now (you)
+#### 🔴 Immediate Repository Actions
 
-1. **Merge PR #1, then PR #2**, in that order: [#1](https://github.com/OdeToTheWind/restful-api-design-patterns/pull/1) has passed CI; [#2](https://github.com/OdeToTheWind/restful-api-design-patterns/pull/2) is built on top of it, and its CI run was still in progress at the time of writing. `main` is protected, so both merge through GitHub once their `verify` and `smoke` checks are green.
-2. **Re-sync your local `main` after merging:** `git switch main && git fetch origin && git reset --hard origin/main`. Your local `main` still holds an unpushed merge commit from the earlier, blocked merge attempt; its contents are identical to PR #1.
-3. **Rotate the MongoDB Atlas password** if that cluster is real (optional; it was never committed).
+- [x] ✅ **Merge PR #1, then PR #2:** [#2](https://github.com/OdeToTheWind/restful-api-design-patterns/pull/2) (incorporating all work from [#1](https://github.com/OdeToTheWind/restful-api-design-patterns/pull/1)) was squash-merged into `main` (`d262298`) with all checks green, and PR #1 was closed as superseded.
+- [x] ✅ **Re-sync local `main` after merging:** Local `main` was switched and hard-reset to `origin/main` (`d262298`), ensuring clean working tree and up-to-date linear history.
+- [ ] ➖ **Rotate the MongoDB Atlas password:** Optional manual action if that cluster is active (verified never committed to Git history).
 
-#### 🟡 Days 31–40 (fold into the planned lessons)
+#### 🟡 Days 31–40 (Curriculum Road Map)
 
-4. **Day 31 — Spec-first API:** OpenAPI for every demo (move Day 29's registry helpers into `@restful/shared`) and generate a typed client from the spec.
-5. **Day 32 — Pagination:** a shared `paginationQuerySchema` + `paginate()` helper (cursor and offset), validated with `validateQuery` from `@restful/shared`.
-6. **Day 33 — Redis caching:** add Redis to the demo's compose file and to `pnpm smoke`; cache-aside with explicit invalidation on writes.
-7. **Day 35 — Seeding:** Prisma seed scripts, reused by `pnpm smoke` and local dev, so tests and demos start from known data.
-8. **Day 37 — Repository + service layer:** move Prisma calls out of controllers; tests then mock repositories instead of Prisma.
-9. **Day 38 — DTO mappers:** explicit `toPublicUser()`-style mappers, so fields like `password` are excluded by construction rather than by remembering a `select`.
+- [ ] ❌ **Day 31 — Spec-first API:** OpenAPI for every demo (move Day 29's registry helpers into `@restful/shared`) and generate a typed client from the spec.
+- [ ] ❌ **Day 32 — Pagination:** A shared `paginationQuerySchema` + `paginate()` helper (cursor and offset), validated with `validateQuery` from `@restful/shared`.
+- [ ] ❌ **Day 33 — Redis caching:** Add Redis to the demo's compose file and to `pnpm smoke`; cache-aside with explicit invalidation on writes.
+- [ ] ❌ **Day 35 — Seeding:** Prisma seed scripts, reused by `pnpm smoke` and local dev, so tests and demos start from known data.
+- [ ] ❌ **Day 37 — Repository + service layer:** Move Prisma calls out of controllers; tests then mock repositories instead of Prisma.
+- [ ] ❌ **Day 38 — DTO mappers:** Explicit `toPublicUser()`-style mappers, so fields like `password` are excluded by construction rather than by remembering a `select`.
 
-#### 🟢 Days 41–50
+#### 🟢 Days 41–50 (Advanced Infrastructure & Auth)
 
-10. **Day 43 — Cookie-based refresh tokens:** move the refresh token into an `httpOnly`, `SameSite=Strict` cookie, handle CSRF, and add "list / revoke my sessions" endpoints on top of the existing `refresh_tokens` table.
-11. **Day 45 — Testcontainers:** turn the bash smoke checks into Jest integration tests with Testcontainers, so failures come with real assertions and stack traces.
-12. **Day 46 — Docker:** multi-stage Dockerfile per demo; the compose file runs app + database, with container health checks using the existing `/ready` probe.
-13. **Day 47/49 — Pipeline & config:** upload coverage reports and build Docker images in CI (Day 47). Validate all environment variables with one Zod schema at startup (`loadEnv()` in `@restful/shared`, Day 49), replacing the ad-hoc `requireEnv` / `||` defaults.
+- [ ] ❌ **Day 43 — Cookie-based refresh tokens:** Move the refresh token into an `httpOnly`, `SameSite=Strict` cookie, handle CSRF, and add "list / revoke my sessions" endpoints on top of the existing `refresh_tokens` table.
+- [ ] ❌ **Day 45 — Testcontainers:** Turn the bash smoke checks into Jest integration tests with Testcontainers, so failures come with real assertions and stack traces.
+- [ ] ❌ **Day 46 — Docker:** Multi-stage Dockerfile per demo; the compose file runs app + database, with container health checks using the existing `/ready` probe.
+- [ ] ❌ **Day 47/49 — Pipeline & config:** Upload coverage reports and build Docker images in CI (Day 47). Validate all environment variables with one Zod schema at startup (`loadEnv()` in `@restful/shared`, Day 49), replacing the ad-hoc `requireEnv` / `||` defaults.
 
 ---
 
