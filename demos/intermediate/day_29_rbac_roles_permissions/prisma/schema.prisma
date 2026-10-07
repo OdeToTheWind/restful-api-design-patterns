@@ -1,0 +1,47 @@
+generator client {
+  provider = "prisma-client-js"
+  // Per-demo output: demos share one @prisma/client install in the pnpm workspace,
+  // so the default location would be overwritten by whichever demo generated last.
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  refreshTokens RefreshToken[]
+
+  @@map("users")
+}
+
+// Only the SHA-256 hash of a refresh token is stored. Each refresh revokes the
+// presented token and links it to its replacement (rotation).
+model RefreshToken {
+  id           String    @id @default(cuid())
+  tokenHash    String    @unique
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  replacedById String?
+  createdAt    DateTime  @default(now())
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+enum Role {
+  USER
+  ADMIN
+  MODERATOR
+}

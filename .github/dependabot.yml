@@ -1,0 +1,21 @@
+# Weekly dependency update PRs. Updates are grouped so the 31 workspace
+# packages produce a few PRs per week instead of one per dependency.
+version: 2
+updates:
+  - package-ecosystem: npm # also handles pnpm workspaces + pnpm-lock.yaml
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # Major upgrades change APIs the lessons were written against — do these deliberately
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

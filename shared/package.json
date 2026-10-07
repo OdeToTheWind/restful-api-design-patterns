@@ -1,0 +1,36 @@
+{
+  "name": "@restful/shared",
+  "version": "1.0.0",
+  "description": "Reusable building blocks shared by the intermediate+ demos",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepare": "tsc",
+    "test": "jest",
+    "test:coverage": "jest --coverage"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "zod": "^3.23.8",
+    "winston": "^3.13.0"
+  },
+  "peerDependencies": {
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.14.0",
+    "@types/supertest": "^6.0.2",
+    "express": "^4.19.2",
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0",
+    "ts-jest": "^29.2.5",
+    "typescript": "^5.5.3"
+  }
+}
