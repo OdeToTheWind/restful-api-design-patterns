@@ -1,0 +1,28 @@
+# Credentials come from this demo's .env (docker compose reads it automatically).
+# Keep POSTGRES_* in sync with DATABASE_URL — see .env.example.
+services:
+  postgres:
+    image: postgres:16
+    container_name: postgres-day33
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
+    ports:
+      - '127.0.0.1:5432:5432' # localhost only — not reachable from the LAN
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis-day33
+    restart: always
+    # Cache only: no persistence, and evict least-recently-used keys when memory is full
+    command:
+      ['redis-server', '--save', '', '--appendonly', 'no', '--maxmemory', '64mb', '--maxmemory-policy', 'allkeys-lru']
+    ports:
+      - '127.0.0.1:6379:6379'
+
+volumes:
+  postgres_data:
