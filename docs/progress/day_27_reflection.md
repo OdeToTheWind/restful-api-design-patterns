@@ -109,3 +109,4 @@ Changes made after this day during the code-quality review (see `assessment.md`)
 - Prisma errors map to HTTP codes: duplicate email `409`, missing record `404`.
 - `docker-compose.yml` reads `POSTGRES_*` from `.env` and binds to localhost only.
 - 13 tests + real-Postgres checks in `pnpm smoke`.
+- *(Round 3)* `:id` must be a cuid (`validateParams`), so malformed ids get 400 instead of reaching Prisma. Added `/health`, `/ready` (`SELECT 1`) and graceful shutdown (`prisma.$disconnect()` on SIGTERM).

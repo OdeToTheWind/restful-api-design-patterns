@@ -54,6 +54,8 @@ Whether you're a beginner solidifying fundamentals or an experienced engineer re
 ├── package.json                # Workspace root (build / lint / test / verify scripts)
 ├── pnpm-workspace.yaml         # shared + demos/*/* + demos/_template
 ├── eslint.config.mjs
+├── .prettierrc.json            # formatting (pnpm format / format:check)
+├── .editorconfig
 ├── .nvmrc                      # Node 22
 ├── README.md                   # This file — main roadmap & progress tracker
 ├── assessment.md               # Code-quality assessment, issue tracker & next steps
@@ -67,8 +69,9 @@ Whether you're a beginner solidifying fundamentals or an experienced engineer re
 │   └── real-world/             # Demos 76–100
 └── shared/                     # @restful/shared — used by Day 26 onward
     └── src/                    # ApiResponse, AppError, asyncHandler, errorHandler,
-                                # notFoundHandler, validateBody, logger, requestId,
-                                # requestLogger, typed req.user / req.id
+                                # notFoundHandler, validateBody/Query/Params, logger,
+                                # requestId, requestLogger, healthRouter, startServer,
+                                # typed req.user / req.id
 ```
 ---
 ## Daily Progress
@@ -248,6 +251,7 @@ Detailed per-demo docs → [docs/progress/](docs/progress/)
    docker compose up -d     # Postgres for this demo (credentials come from .env)
    pnpm prisma:migrate      # apply migrations (Prisma demos)
    pnpm dev                 # Day 29 API docs: http://localhost:3028/api/docs
+                            # every demo: /health (liveness) and /ready (database check)
    ```
 
 5. **Workspace checks** (run from the repo root — the same steps as CI)
@@ -256,7 +260,8 @@ Detailed per-demo docs → [docs/progress/](docs/progress/)
    pnpm lint            # ESLint on shared/ and intermediate demos
    pnpm test            # Jest + Supertest (database mocked)
    pnpm test:coverage   # same, with coverage thresholds (CI uses this)
-   pnpm verify          # build + lint + test:coverage
+   pnpm format          # Prettier (shared/, intermediate demos, template, configs)
+   pnpm verify          # build + lint + format:check + test:coverage
    pnpm smoke           # real Postgres + MongoDB in throwaway containers (needs Docker; run after build)
    ```
 
@@ -273,7 +278,7 @@ Detailed per-day notes are in `docs/progress/day_XX_reflection.md`. Architecture
 - **pnpm workspace monorepo** — One install, one lockfile, and a `demos/_template` to start each day from
 - **Reusable `@restful/shared` package** — Response envelope, error handling, validation and typed auth context shared by the intermediate+ demos
 - **Production-grade patterns implemented step-by-step** — Idempotency, HATEOAS, soft delete, versioning, RBAC, caching, observability, and more
-- **CI on every push** — dependency audit, type-check, lint, tests with coverage gates, and a real-database smoke test
+- **CI on every push** — dependency audit, type-check, lint, formatting, tests with coverage gates, OpenAPI contract tests, and a real-database smoke test
 - **Progressive learning journey** — Beginner → Intermediate → Advanced → Real-World production applications
 - **Comprehensive documentation** — Daily progress logs, OpenAPI specs, and architecture decisions
 - **Living Portfolio** — A complete showcase of RESTful API design mastery

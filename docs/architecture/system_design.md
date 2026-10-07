@@ -80,11 +80,12 @@ Status code mapping (`normalizeError` in `shared/src/error-handler.ts`):
 ```mermaid
 flowchart LR
   A[Request] --> Q[requestId + requestLogger]
+  Q --> H["/health and /ready"]
   Q --> B[helmet + CORS allow-list]
   B --> C[express.json 10kb]
   C --> D[Router]
   D --> E[authLimiter / authenticate / authorizeRoles]
-  E --> F[validateBody - Zod]
+  E --> F[validateParams / validateBody - Zod]
   F --> G[asyncHandler - controller]
   G -->|ApiResponse.success| R[Response]
   D -->|no match| N[notFoundHandler]
@@ -104,9 +105,11 @@ Middleware order in `app.ts` matters. `notFoundHandler` and `errorHandler` must 
 | `AppError` | An expected error with a status code and client-safe message |
 | `asyncHandler` | Wraps async handlers so rejected promises reach `errorHandler` (Express 4 doesn't do this) |
 | `errorHandler`, `notFoundHandler`, `normalizeError` | Global error handling (Section 2 mapping) |
-| `validateBody(schema)` | Validates and **replaces** `req.body` with the parsed result; unknown keys are stripped |
+| `validateBody` / `validateQuery` / `validateParams` | Validate and **replace** `req.body` / `req.query` / `req.params` with the parsed result; unknown keys stripped, 400 + field errors on failure |
 | `AuthUser`, `isAuthUser` | JWT payload type + runtime guard; importing the package types `req.user` and `req.id` |
 | `logger` | Winston logger: JSON in production, readable in development, silent in tests (unless `LOG_LEVEL`) |
+| `healthRouter(checks)` | `GET /health` (liveness) and `GET /ready` (runs each check with a timeout; 503 naming the failing dependency) |
+| `startServer(app, options)` | `listen()` + SIGTERM/SIGINT handling: stop accepting, drain in-flight requests, run `onShutdown` hooks (e.g. `prisma.$disconnect()`), exit; forced exit after a timeout |
 | `requestId`, `requestLogger` | `X-Request-Id` on every response (reuses a safe incoming id) + one log line per request with status and duration |
 
 Used by Days 26–30 and `demos/_template`. Day 30's original hand-written middleware is documented in `docs/progress/day_30_reflection.md`; the code now uses the shared version so only one implementation exists.
@@ -179,3 +182,15 @@ Each record is short: what was decided, why, and what it costs.
 - **Decision:** Day 29 builds its OpenAPI 3.1 document with `@asteasolutions/zod-to-openapi` from the same schemas used by `validateBody`, served at `/api/docs/openapi.json` with Swagger UI at `/api/docs`.
 - **Why:** Hand-written specs drift. Here, a field added to a validator appears in the docs automatically, and a test checks that every route is documented and that `role` is not in the register body.
 - **Cost:** Response shapes are still declared by hand in `src/docs/openapi.ts`.
+
+### ADR-011 — Health probes and graceful shutdown in every demo
+
+- **Decision:** Every app mounts `healthRouter`. `/health` never touches dependencies; `/ready` pings the database (`SELECT 1` / Mongo `ping`) with a 2-second timeout. Entry points use `startServer`. On SIGTERM/SIGINT it stops accepting connections, closes idle keep-alive sockets, waits for in-flight requests, disconnects the database, and exits 0. It forces exit 1 after 10 seconds.
+- **Why:** Docker, Kubernetes and load balancers need a separate liveness and readiness signal. Without a graceful shutdown, every restart or deploy cuts off requests and leaves connections open on the database.
+- **Cost:** Probe requests appear in the request log at `debug` level only. The smoke test checks both probes and a real SIGTERM exit code for every demo.
+
+### ADR-012 — Two layers of login throttling
+
+- **Decision:** Auth routes keep the per-IP limiter (`AUTH_RATE_LIMIT`). `/login` also has a per-account limiter keyed on the normalised email (`LOGIN_ACCOUNT_LIMIT`, default 5 per 15 minutes), which counts **failed** logins only.
+- **Why:** Credential stuffing spreads attempts across many IPs, so a per-IP limit alone doesn't slow guessing against one account. Counting only failures means the real user's successful logins never lock them out.
+- **Cost:** Anyone who knows an email can lock that account for up to 15 minutes by failing logins (a nuisance-level denial of service). This is accepted for a demo. Production systems usually add CAPTCHA or step-up verification instead of a hard block.

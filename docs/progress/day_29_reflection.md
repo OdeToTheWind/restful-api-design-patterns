@@ -183,3 +183,4 @@ Changes made after this day during the code-quality review (see `assessment.md`)
 - `authorizeRoles(...roles: Role[])` uses the Prisma `Role` enum, so a typo like `'ADMN'` fails to compile.
 - **API docs:** OpenAPI 3.1 generated from the Zod validators at `/api/docs/openapi.json`, Swagger UI at `/api/docs` (ADR-010).
 - 40 tests + real-Postgres RBAC/token checks in `pnpm smoke`.
+- *(Round 3)* Same per-account throttling, probes and graceful shutdown as Day 28. Contract tests now check real responses against the OpenAPI document. Undocumented fields fail, so a leaked password hash would be caught.

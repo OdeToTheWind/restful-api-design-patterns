@@ -138,3 +138,4 @@ Changes made after this day during the code-quality review (see `assessment.md`)
 - **Refresh tokens:** access tokens now last 15 minutes. Login also returns a `refreshToken`; `POST /api/auth/refresh` exchanges it for a new pair and revokes the old one; reusing a revoked token revokes all of the user's sessions; `POST /api/auth/logout` revokes it. Only SHA-256 hashes are stored (`refresh_tokens` table, migration `20261007120000_add_refresh_tokens`). See ADR-009.
 - `/me` uses the typed `req.user` from `@restful/shared` — no more `(req as any).user`.
 - 29 tests + real-Postgres checks of the whole token lifecycle in `pnpm smoke`.
+- *(Round 3)* Per-account login throttling: after `LOGIN_ACCOUNT_LIMIT` (default 5) failed logins for one email in 15 minutes, further attempts get 429 from any IP; successful logins don't count (ADR-012). Added `/health`, `/ready` and graceful shutdown.

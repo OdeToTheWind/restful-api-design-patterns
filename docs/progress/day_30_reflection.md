@@ -100,3 +100,4 @@ Changes made after this day during the code-quality review (see `assessment.md`)
 - Fixed while moving it: the 404 handler was missing, and the error handler had been registered before the `/` route. Both are now registered after every route.
 - Unexpected errors are logged with Winston together with the request's `X-Request-Id`; the client only ever sees `Internal Server Error`.
 - 8 tests + checks in `pnpm smoke`.
+- *(Round 3)* Uses `startServer` for graceful shutdown and exposes `/health` + `/ready`.

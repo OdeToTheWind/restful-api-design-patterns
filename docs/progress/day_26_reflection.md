@@ -91,3 +91,4 @@ Changes made after this day during the code-quality review (see `assessment.md`)
 - The server connects to MongoDB **before** `listen()` and exits if the connection fails.
 - `helmet`, a CORS allow-list (`CORS_ORIGIN`) and an `X-Request-Id` header on every response.
 - 13 tests (Mongoose model methods stubbed) + real-MongoDB checks in `pnpm smoke`.
+- *(Round 3)* Malformed ids (`/api/todos/not-an-id`) are rejected by `validateParams` with 400 before Mongoose runs. Added `/health`, `/ready` (Mongo ping) and graceful shutdown: SIGTERM drains requests, then `mongoose.disconnect()`.
