@@ -171,3 +171,15 @@ services:
 **Status: ✅ Day 29 Successfully Completed**  
 **Progress: 29/100 Days**  
 **Milestone: Role-Based Access Control (RBAC) system implemented!**
+
+---
+
+## Follow-up (October 7, 2026)
+
+Changes made after this day during the code-quality review (see `assessment.md`):
+
+- Same auth hardening as Day 28 (required secret, Zod validation, rate limiting, timing-safe login, 15-minute access tokens + rotating refresh tokens).
+- **Security fix:** `GET /api/users` exposed every user's email to any logged-in `USER`; it now requires `ADMIN` or `MODERATOR`. `/api/users/admin` returns a real user count.
+- `authorizeRoles(...roles: Role[])` uses the Prisma `Role` enum, so a typo like `'ADMN'` fails to compile.
+- **API docs:** OpenAPI 3.1 generated from the Zod validators at `/api/docs/openapi.json`, Swagger UI at `/api/docs` (ADR-010).
+- 40 tests + real-Postgres RBAC/token checks in `pnpm smoke`.

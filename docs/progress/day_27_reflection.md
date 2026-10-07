@@ -97,3 +97,15 @@ day_27_postgres_prisma_users/
 
 **Status: ✅ Day 27 Successfully Completed**  
 **Progress: 27/100 Days**
+
+---
+
+## Follow-up (October 7, 2026)
+
+Changes made after this day during the code-quality review (see `assessment.md`):
+
+- **Security fix:** `POST`/`PUT /api/users` used to pass `req.body` straight to Prisma, so a client could set `role: "ADMIN"` (mass assignment). Only `name`, `email` and `age` are accepted now (Zod whitelist).
+- One `PrismaClient` per process in `src/lib/prisma.ts`; the client is generated to `generated/prisma` (see ADR-003 in `docs/architecture/system_design.md`).
+- Prisma errors map to HTTP codes: duplicate email `409`, missing record `404`.
+- `docker-compose.yml` reads `POSTGRES_*` from `.env` and binds to localhost only.
+- 13 tests + real-Postgres checks in `pnpm smoke`.

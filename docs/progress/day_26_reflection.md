@@ -79,3 +79,15 @@ day_26_mongodb_mongoose_todos/
 **Status: ✅ Day 26 Successfully Completed**  
 **Progress: 26/100 Days**  
 **Milestone: Successfully moved to real database (MongoDB + Mongoose)!**
+
+---
+
+## Follow-up (October 7, 2026)
+
+Changes made after this day during the code-quality review (see `assessment.md`):
+
+- Request bodies are validated with Zod (`title` 1–200 chars, `completed` boolean); unknown fields are dropped.
+- Async errors go through `asyncHandler` to the shared error handler: an invalid ObjectId now returns `400`, a missing todo `404`, and nothing returns Express's HTML error page.
+- The server connects to MongoDB **before** `listen()` and exits if the connection fails.
+- `helmet`, a CORS allow-list (`CORS_ORIGIN`) and an `X-Request-Id` header on every response.
+- 13 tests (Mongoose model methods stubbed) + real-MongoDB checks in `pnpm smoke`.

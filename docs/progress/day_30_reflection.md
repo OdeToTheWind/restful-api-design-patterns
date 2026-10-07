@@ -89,3 +89,14 @@ day_30_global_error_middleware/
 **Status: ✅ Day 30 Successfully Completed**  
 **Progress: 30/100 Days**  
 **Milestone: Professional centralized error handling system implemented — a key requirement for production-grade APIs!**
+
+---
+
+## Follow-up (October 7, 2026)
+
+Changes made after this day during the code-quality review (see `assessment.md`):
+
+- The global error handler built today graduated into `@restful/shared` (`errorHandler`, `notFoundHandler`, `AppError`) and is used by every demo from Day 26 onward. This demo now uses the shared version, so only one implementation exists.
+- Fixed while moving it: the 404 handler was missing, and the error handler had been registered before the `/` route. Both are now registered after every route.
+- Unexpected errors are logged with Winston together with the request's `X-Request-Id`; the client only ever sees `Internal Server Error`.
+- 8 tests + checks in `pnpm smoke`.

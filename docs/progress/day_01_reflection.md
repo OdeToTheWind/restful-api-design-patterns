@@ -38,7 +38,7 @@ day_1_basic_express_server/
 ├── package.json
 └── .env.example
 ```
-# API Development Progress
+## API Development Progress
 
 ## API Endpoints Implemented
 

@@ -126,3 +126,15 @@ services:
 **Status: ✅ Day 28 Successfully Completed**  
 **Progress: 28/100 Days**  
 **Milestone: Full JWT Authentication system with real database implemented!**
+
+---
+
+## Follow-up (October 7, 2026)
+
+Changes made after this day during the code-quality review (see `assessment.md`):
+
+- `JWT_SECRET` is required — the app refuses to start without it (the hardcoded fallback secret is gone).
+- Register/login inputs validated with Zod (password 8–72 chars, email lowercased); auth routes rate-limited (`AUTH_RATE_LIMIT`, default 10 per 15 min per IP); login takes the same time whether or not the email exists.
+- **Refresh tokens:** access tokens now last 15 minutes. Login also returns a `refreshToken`; `POST /api/auth/refresh` exchanges it for a new pair and revokes the old one; reusing a revoked token revokes all of the user's sessions; `POST /api/auth/logout` revokes it. Only SHA-256 hashes are stored (`refresh_tokens` table, migration `20261007120000_add_refresh_tokens`). See ADR-009.
+- `/me` uses the typed `req.user` from `@restful/shared` — no more `(req as any).user`.
+- 29 tests + real-Postgres checks of the whole token lifecycle in `pnpm smoke`.
