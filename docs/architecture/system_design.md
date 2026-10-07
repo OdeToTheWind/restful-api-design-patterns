@@ -111,6 +111,10 @@ Middleware order in `app.ts` matters. `notFoundHandler` and `errorHandler` must 
 | `healthRouter(checks)` | `GET /health` (liveness) and `GET /ready` (runs each check with a timeout; 503 naming the failing dependency) |
 | `startServer(app, options)` | `listen()` + SIGTERM/SIGINT handling: stop accepting, drain in-flight requests, run `onShutdown` hooks (e.g. `prisma.$disconnect()`), exit; forced exit after a timeout |
 | `requestId`, `requestLogger` | `X-Request-Id` on every response (reuses a safe incoming id) + one log line per request with status and duration |
+| `createApiRegistry`, `generateOpenApiDocument`, `docsRouter`, `jsonContent`, `successEnvelope` | Document a demo's API from its Zod schemas; serve `/api/docs` + `/api/docs/openapi.json` |
+| `offsetPaginationQuery`, `cursorPaginationQuery`, `paginateOffset`, `paginateCursor`, `encodeCursor`/`decodeCursor` | Offset and keyset pagination with consistent `meta` |
+| `loadEnv`, `envFields` | Validate the whole environment with one Zod schema at startup; reusable field types (port, csv, flag, secret) |
+| `@restful/shared/testing` → `createContractMatcher` | Test helper: assert a response matches the OpenAPI document (closed objects, documented status) |
 
 Used by Days 26–30 and `demos/_template`. Day 30's original hand-written middleware is documented in `docs/progress/day_30_reflection.md`; the code now uses the shared version so only one implementation exists.
 
@@ -194,3 +198,63 @@ Each record is short: what was decided, why, and what it costs.
 - **Decision:** Auth routes keep the per-IP limiter (`AUTH_RATE_LIMIT`). `/login` also has a per-account limiter keyed on the normalised email (`LOGIN_ACCOUNT_LIMIT`, default 5 per 15 minutes), which counts **failed** logins only.
 - **Why:** Credential stuffing spreads attempts across many IPs, so a per-IP limit alone doesn't slow guessing against one account. Counting only failures means the real user's successful logins never lock them out.
 - **Cost:** Anyone who knows an email can lock that account for up to 15 minutes by failing logins (a nuisance-level denial of service). This is accepted for a demo. Production systems usually add CAPTCHA or step-up verification instead of a hard block.
+
+### ADR-013 — Spec-first contracts and committed generated clients
+
+- **Decision:** From Day 31, a demo's contract (Zod schemas + documented operations) is written first. Validation, the OpenAPI document and a typed client (`openapi-typescript` + `openapi-fetch`) are generated from it. The generated `openapi.json` and client types are committed, and a drift check fails when they're stale.
+- **Why:** Consumers can review and diff the contract in pull requests, and the compiler catches client/API mismatches.
+- **Cost:** Regenerate (`pnpm openapi:generate`) after changing the contract. Generated files are excluded from Prettier so they stay byte-identical to the generator output.
+
+### ADR-014 — Two pagination styles, chosen per endpoint
+
+- **Decision:** Offset pagination (`page`, `pageSize`) for searchable lists that need page numbers. Cursor (keyset) pagination for feeds, with opaque cursors over a unique sort key `(createdAt, id)`. Sorting is always a whitelist with an `id` tie-breaker.
+- **Why:** Offset is simple but slows down and shifts under writes; keyset stays fast and stable but only goes forward.
+- **Cost:** Two code paths. Cursors must be validated: a malformed one is a 400, not a 500.
+
+### ADR-015 — Redis as an optional cache (cache-aside)
+
+- **Decision:** Reads use cache-aside with a TTL. Writes go to the database first, then invalidate the item key and bump a list version. Redis failures degrade to `X-Cache: BYPASS` instead of errors, and readiness doesn't depend on Redis.
+- **Why:** The cache only exists for speed. Losing it must never lose correctness or availability.
+- **Cost:** A short staleness window is possible if an invalidation fails; the TTL bounds it.
+
+### ADR-016 — Deterministic, idempotent seeds
+
+- **Decision:** Seed data is static (no random values or "now"), upserted on natural keys, organised in profiles, and covered by a snapshot test.
+- **Why:** The same database in every environment, and seeds that are safe to re-run at any time.
+- **Cost:** Every seeded table needs a natural unique key.
+
+### ADR-017 — Service and repository layers with injected dependencies
+
+- **Decision:** Where business rules exist (Day 37+), controllers call services, and services depend on repository interfaces. Apps are built with `createApp(dependencies)`, and `index.ts` is the only composition root.
+- **Why:** Rules are testable without a database (in-memory repository, injected clock), and storage can change without touching the rules.
+- **Cost:** More files per feature. Simple CRUD demos may skip the layers.
+
+### ADR-018 — Responses are DTOs built by mappers
+
+- **Decision:** Entities never leave the API directly. Mappers build each DTO field by field, one per audience (public, private, admin).
+- **Why:** A column added to a table stays private until someone decides which view exposes it.
+- **Cost:** Each new response field must be added to a mapper (intentionally).
+
+### ADR-019 — Refresh tokens in httpOnly cookies with double-submit CSRF
+
+- **Decision:** In browser-facing auth (Day 43), the refresh token lives in an `httpOnly; SameSite=Strict; Path=/api/auth` cookie. Cookie-authenticated endpoints require an `X-CSRF-Token` header that matches a readable `csrf_token` cookie. Each login is a named session that survives rotation and can be listed or revoked.
+- **Why:** XSS can't read the refresh token, cross-site requests can't use it, and users can sign out lost devices.
+- **Cost:** CORS needs explicit origins with `credentials: true`, and clients must echo the CSRF cookie.
+
+### ADR-020 — Real-database integration tests with Testcontainers
+
+- **Decision:** Database-dependent behaviour (constraints, Postgres-specific types and indexes) is tested against a disposable PostgreSQL started by Testcontainers. This is a separate `test:integration` suite that runs in the CI `smoke` job.
+- **Why:** Mocks can't prove that a constraint, an index or an array query behaves as expected.
+- **Cost:** Needs Docker and takes longer, so it runs apart from the fast unit suite.
+
+### ADR-021 — One Dockerfile for every demo
+
+- **Decision:** `docker/demo.Dockerfile` builds any workspace package (`--build-arg PACKAGE=…`). It uses a multi-stage build, `pnpm deploy --prod`, a non-root `node` user and a `/health` HEALTHCHECK. Compose runs migrations as a one-off job, and the API waits for it and reports readiness with `/ready`.
+- **Why:** Small, reproducible images; migrations never race app replicas; `docker stop` triggers the graceful shutdown from ADR-011.
+- **Cost:** Each containerised demo lists its runtime files (`"files"`) and needs the Prisma CLI as a runtime dependency.
+
+### ADR-022 — Layered, validated environment configuration
+
+- **Decision:** `.env.<env>.local` → `.env.local` → `.env.<env>` → `.env`, with real environment variables winning. Per-environment defaults are committed; secrets never are. One Zod schema validates everything at startup, including production-only rules, and the app receives a typed config object.
+- **Why:** Misconfiguration fails at boot with a complete list, and nothing reads `process.env` after startup.
+- **Cost:** Every new setting is added to the schema and `.env.example`.
