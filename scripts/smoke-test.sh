@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Real-database smoke test for the intermediate demos (Days 26–30).
+# Real-database smoke test for the intermediate demos (Days 26–49).
 #
-# Starts throwaway PostgreSQL + MongoDB containers (no volumes, removed on exit),
+# Starts throwaway PostgreSQL, MongoDB and Redis containers (no volumes, removed on exit),
 # applies each demo's real Prisma migrations, starts every demo from dist/ and
 # checks its behaviour over HTTP. Your own containers, volumes and .env files are
 # not touched: everything is passed through environment variables.
@@ -17,6 +17,8 @@ MONGO_PORT="${SMOKE_MONGO_PORT:-57017}"
 SUFFIX="$$"
 PG_CONTAINER="restful-smoke-pg-$SUFFIX"
 MONGO_CONTAINER="restful-smoke-mongo-$SUFFIX"
+REDIS_CONTAINER="restful-smoke-redis-$SUFFIX"
+REDIS_PORT="${SMOKE_REDIS_PORT:-56379}"
 PG="postgresql://postgres:smoke@127.0.0.1:$PG_PORT"
 TMP="$(mktemp -d)"
 SERVER_PID=""
@@ -27,7 +29,7 @@ export NODE_ENV=development AUTH_RATE_LIMIT=1000 LOGIN_ACCOUNT_LIMIT=1000 LOG_LE
 
 cleanup() {
   [ -n "$SERVER_PID" ] && kill "$SERVER_PID" 2>/dev/null
-  docker rm -f "$PG_CONTAINER" "$MONGO_CONTAINER" >/dev/null 2>&1
+  docker rm -f "$PG_CONTAINER" "$MONGO_CONTAINER" "$REDIS_CONTAINER" >/dev/null 2>&1
   rm -rf "$TMP"
 }
 trap cleanup EXIT
@@ -67,16 +69,19 @@ probes() { # port — liveness and readiness against the real database
 migrate() { (cd "$DEMOS/$1" && npx prisma migrate deploy >"$TMP/$1.migrate.log" 2>&1) || { echo "  FAIL migrations for $1:"; cat "$TMP/$1.migrate.log"; FAIL=1; }; }
 
 # ---- databases -------------------------------------------------------------
-for d in day_26_mongodb_mongoose_todos day_27_postgres_prisma_users day_28_jwt_authentication day_29_rbac_roles_permissions day_30_global_error_middleware; do
+ALL_DEMOS=$(cd "$DEMOS" && ls -d day_2[6-9]_* day_3[0-9]_* day_4[0-9]_* 2>/dev/null)
+for d in $ALL_DEMOS; do
+  [ -f "$DEMOS/$d/package.json" ] || continue
   [ -f "$DEMOS/$d/dist/index.js" ] || { echo "Missing $d/dist — run 'pnpm build' first."; exit 1; }
 done
 
 echo "Starting throwaway databases…"
 docker run -d --rm --name "$PG_CONTAINER" -e POSTGRES_PASSWORD=smoke -p "127.0.0.1:$PG_PORT:5432" postgres:16 >/dev/null || exit 1
 docker run -d --rm --name "$MONGO_CONTAINER" -p "127.0.0.1:$MONGO_PORT:27017" mongo:7 >/dev/null || exit 1
+docker run -d --rm --name "$REDIS_CONTAINER" -p "127.0.0.1:$REDIS_PORT:6379" redis:7-alpine >/dev/null || exit 1
 timeout 120 sh -c "until docker exec $PG_CONTAINER pg_isready -U postgres -h 127.0.0.1 >/dev/null 2>&1; do sleep 1; done" || { echo "Postgres did not start"; exit 1; }
 timeout 120 sh -c "until docker exec $MONGO_CONTAINER mongosh --quiet --eval 'db.runCommand({ping:1}).ok' >/dev/null 2>&1; do sleep 1; done" || { echo "MongoDB did not start"; exit 1; }
-for db in day27 day28 day29; do docker exec "$PG_CONTAINER" createdb -U postgres "$db"; done
+for db in day27 day28 day29 day31 day32 day33 day35 day37 day38 day43; do docker exec "$PG_CONTAINER" createdb -U postgres "$db"; done
 
 # ---- Day 26 ----------------------------------------------------------------
 echo "== Day 26 (MongoDB + Mongoose)"
@@ -181,9 +186,139 @@ check "crash → generic 500" "Internal Server Error" "$(req GET $B/server-error
 check "unknown route → JSON 404" false "$(req GET localhost:4030/api/nope >/dev/null; field success)"
 stop
 
+# ---- Day 31 ----------------------------------------------------------------
+echo "== Day 31 (spec-first OpenAPI)"
+export DATABASE_URL="$PG/day31"
+migrate day_31_swagger_openapi_docs
+start day_31_swagger_openapi_docs 4031; B=localhost:4031/api/books
+probes 4031
+check "create book (hyphenated ISBN) → 201" 201 "$(req POST $B '{"title":"Refactoring","author":"Martin Fowler","isbn":"978-0-13-475759-9"}')"
+check "ISBN normalised" 9780134757599 "$(field data.isbn)"
+BOOK=$(field data.id)
+check "duplicate ISBN → 409" 409 "$(req POST $B '{"title":"Copy","author":"X","isbn":"9780134757599"}')"
+check "patch → 200" 200 "$(req PATCH "$B/$BOOK" '{"publishedYear":2018}')"
+check "get → 200" 200 "$(req GET "$B/$BOOK")"
+check "served spec is OpenAPI 3.1" 3.1.0 "$(req GET localhost:4031/api/docs/openapi.json >/dev/null; field openapi)"
+stop
+
+# ---- Day 32 ----------------------------------------------------------------
+echo "== Day 32 (pagination, filtering, sorting)"
+export DATABASE_URL="$PG/day32"
+migrate day_32_advanced_pagination_filter_sort
+start day_32_advanced_pagination_filter_sort 4032; B=localhost:4032/api/products
+for p in "Clean Code:books:3999" "Refactoring:books:4599" "SICP:books:5099" "Chess:games:1999" "Go:games:2999"; do
+  IFS=: read -r name category price <<<"$p"
+  req POST $B "{\"name\":\"$name\",\"category\":\"$category\",\"priceCents\":$price}" >/dev/null
+done
+check "filter + sort + page → 200" 200 "$(req GET "$B?category=books&sort=-price&pageSize=2")"
+check "total books" 3 "$(field data.meta.totalItems)"
+check "most expensive first" SICP "$(field data.items.0.name)"
+check "2 pages" 2 "$(field data.meta.totalPages)"
+check "price range filter" 2 "$(req GET "$B?minPrice=2000&maxPrice=4000" >/dev/null; field data.meta.totalItems)"
+req GET "$B/feed?limit=3" >/dev/null; CURSOR=$(field data.meta.nextCursor)
+check "feed page 1 has a cursor" true "$([ "$CURSOR" != null ] && echo true || echo false)"
+check "feed page 2 continues after it" 2 "$(req GET "$B/feed?limit=3&cursor=$CURSOR" >/dev/null; node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1])).data.items.length)' "$TMP/body")"
+check "unknown sort → 400" 400 "$(req GET "$B?sort=password")"
+stop
+
+# ---- Day 33 ----------------------------------------------------------------
+echo "== Day 33 (Redis caching)"
+export DATABASE_URL="$PG/day33" REDIS_URL="redis://127.0.0.1:$REDIS_PORT"
+migrate day_33_caching_redis_intro
+start day_33_caching_redis_intro 4033; B=localhost:4033/api/products
+req POST $B '{"name":"Keyboard","priceCents":4999}' >/dev/null; PRODUCT=$(field data.id)
+req GET "$B/$PRODUCT" >/dev/null; check "first read → MISS" MISS "$(header x-cache)"
+req GET "$B/$PRODUCT" >/dev/null; check "second read → HIT" HIT "$(header x-cache)"
+req PATCH "$B/$PRODUCT" '{"priceCents":3999}' >/dev/null
+req GET "$B/$PRODUCT" >/dev/null; check "after update → MISS" MISS "$(header x-cache)"
+check "fresh value after update" 3999 "$(field data.priceCents)"
+req GET $B >/dev/null; req GET $B >/dev/null; check "list cached → HIT" HIT "$(header x-cache)"
+docker stop "$REDIS_CONTAINER" >/dev/null
+check "Redis down: still 200" 200 "$(req GET "$B/$PRODUCT")"
+check "Redis down: X-Cache BYPASS" BYPASS "$(header x-cache)"
+stop
+
+# ---- Day 35 ----------------------------------------------------------------
+echo "== Day 35 (seeding)"
+export DATABASE_URL="$PG/day35"
+migrate day_35_seeding_migrations
+seed35() { (cd "$DEMOS/day_35_seeding_migrations" && SEED_PROFILE=demo npx prisma db seed >"$TMP/seed.log" 2>&1) || { echo "  FAIL seed:"; cat "$TMP/seed.log"; FAIL=1; }; }
+seed35
+start day_35_seeding_migrations 4035; B=localhost:4035/api
+check "published posts after seeding" 12 "$(req GET $B/posts >/dev/null; node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1])).data.length)' "$TMP/body")"
+seed35
+check "seeding twice changes nothing (idempotent)" 12 "$(req GET $B/posts >/dev/null; node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1])).data.length)' "$TMP/body")"
+check "authors" 3 "$(req GET $B/authors >/dev/null; node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1])).data.length)' "$TMP/body")"
+check "drafts are not served → 404" 404 "$(req GET $B/posts/caching-headers-1)"
+stop
+
+# ---- Day 37 ----------------------------------------------------------------
+echo "== Day 37 (repository + service layer)"
+export DATABASE_URL="$PG/day37"
+migrate day_37_repository_service_layer
+start day_37_repository_service_layer 4037; B=localhost:4037/api/tasks
+probes 4037
+req POST $B '{"title":"Ship it","dueDate":"2099-01-01"}' >/dev/null; TASK=$(field data.id)
+check "TODO → DONE is refused → 409" 409 "$(req PUT "$B/$TASK/status" '{"status":"DONE"}')"
+check "TODO → IN_PROGRESS → 200" 200 "$(req PUT "$B/$TASK/status" '{"status":"IN_PROGRESS"}')"
+check "IN_PROGRESS → DONE → 200" 200 "$(req PUT "$B/$TASK/status" '{"status":"DONE"}')"
+check "completedAt recorded" true "$([ "$(field data.completedAt)" != null ] && echo true || echo false)"
+check "done tasks can't be deleted → 409" 409 "$(req DELETE "$B/$TASK")"
+stop
+
+# ---- Day 38 ----------------------------------------------------------------
+echo "== Day 38 (DTOs + mappers)"
+export DATABASE_URL="$PG/day38"
+migrate day_38_dtos_mappers
+start day_38_dtos_mappers 4038; B=localhost:4038/api
+check "register (role in body) → 201" 201 "$(req POST $B/auth/register '{"email":"ada@example.com","password":"correct-horse","displayName":"Ada","role":"ADMIN"}')"
+USER38=$(field data.id)
+check "registered as USER" USER "$(field data.role)"
+req POST $B/auth/login '{"email":"ada@example.com","password":"correct-horse"}' >/dev/null; T38=$(field data.token)
+check "public view has no email" undefined "$(req GET "$B/users/$USER38" >/dev/null; field data.email)"
+check "private view has email" ada@example.com "$(req GET $B/me '' "$T38" >/dev/null; field data.email)"
+check "USER → admin list 403" 403 "$(req GET $B/admin/users '' "$T38")"
+docker exec "$PG_CONTAINER" psql -U postgres -d day38 -qc "UPDATE users SET role='ADMIN', \"internalNotes\"='vip' WHERE email='ada@example.com'" >/dev/null
+req POST $B/auth/login '{"email":"ada@example.com","password":"correct-horse"}' >/dev/null; T38=$(field data.token)
+check "admin view includes notes" vip "$(req GET $B/admin/users '' "$T38" >/dev/null; field data.0.internalNotes)"
+check "no password hash in any view" 0 "$(grep -c 'passwordHash\|\$2a\$' "$TMP/body" || true)"
+stop
+
+# ---- Day 43 ----------------------------------------------------------------
+echo "== Day 43 (cookie sessions)"
+export DATABASE_URL="$PG/day43"
+migrate day_43_auth_sessions_cookies
+start day_43_auth_sessions_cookies 4043; B=localhost:4043/api/auth
+JAR="$TMP/cookies"
+req POST $B/register '{"name":"Ada","email":"ada@example.com","password":"correct-horse"}' >/dev/null
+check "login → 200" 200 "$(curl -s -o "$TMP/body" -w '%{http_code}' -c "$JAR" -X POST $B/login -H 'Content-Type: application/json' -d '{"email":"ada@example.com","password":"correct-horse"}')"
+T43=$(field data.token)
+check "refresh token not in body" 0 "$(grep -ci refresh "$TMP/body" || true)"
+check "refresh cookie is HttpOnly" 1 "$(grep -c '^#HttpOnly_localhost.*refresh_token' "$JAR" || true)"
+CSRF=$(awk '$6=="csrf_token"{print $7}' "$JAR")
+check "refresh without CSRF header → 403" 403 "$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR" -X POST $B/refresh)"
+check "refresh with CSRF header → 200" 200 "$(curl -s -o "$TMP/body" -w '%{http_code}' -b "$JAR" -c "$JAR" -X POST $B/refresh -H "X-CSRF-Token: $CSRF")"
+check "one active session, marked current" true "$(req GET $B/sessions '' "$(field data.token)" >/dev/null; field data.0.current)"
+CSRF=$(awk '$6=="csrf_token"{print $7}' "$JAR")
+check "logout → 200" 200 "$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR" -c "$JAR" -X POST $B/logout -H "X-CSRF-Token: $CSRF")"
+check "no sessions left" 0 "$(req GET $B/sessions '' "$T43" >/dev/null; node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1])).data.length)' "$TMP/body")"
+stop
+
+# ---- Day 49 ----------------------------------------------------------------
+echo "== Day 49 (environment configs)"
+OUT=$(cd "$DEMOS/day_49_environment_configs" && NODE_ENV=production ADMIN_API_KEY= timeout 10 node dist/index.js 2>&1)
+case "$OUT" in *"ADMIN_API_KEY: is required in production"*) echo "  PASS production refuses to start without ADMIN_API_KEY";; *) echo "  FAIL production started without ADMIN_API_KEY"; FAIL=1;; esac
+KEY49=$(node -e "console.log('k'.repeat(32))")
+NODE_ENV=production ADMIN_API_KEY="$KEY49" LOG_LEVEL=error start day_49_environment_configs 4049
+check "environment from NODE_ENV" production "$(req GET localhost:4049/api/info >/dev/null; field data.environment)"
+check ".env.production defaults applied (flag off)" false "$(field data.features.newGreeting)"
+check "admin config → 200 with key" 200 "$(curl -s -o "$TMP/body" -w '%{http_code}' -H "X-Admin-Key: $KEY49" localhost:4049/api/admin/config)"
+check "secret redacted" "[set]" "$(field data.adminApiKey)"
+stop
+
 echo "== Startup without JWT_SECRET (Day 28)"
 OUT=$(cd "$DEMOS/day_28_jwt_authentication" && JWT_SECRET='' node -e "require('./dist/config')" 2>&1)
-case "$OUT" in *"Missing required environment variable: JWT_SECRET"*) echo "  PASS refuses to start";; *) echo "  FAIL started without secret"; FAIL=1;; esac
+case "$OUT" in *"Invalid environment configuration"*"JWT_SECRET"*) echo "  PASS refuses to start";; *) echo "  FAIL started without secret"; FAIL=1;; esac
 
 echo
 [ "$FAIL" = 0 ] && echo "ALL SMOKE CHECKS PASSED" || echo "SOME SMOKE CHECKS FAILED"

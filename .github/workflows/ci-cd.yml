@@ -6,10 +6,21 @@ on:
   pull_request:
     branches: [main]
 
+# A newer push to the same branch/PR cancels the run that's still going
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege: the workflow only reads the repository
+permissions:
+  contents: read
+
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
+      fail-fast: false
       matrix:
         node-version: [20.x, 24.x]
 
@@ -45,10 +56,26 @@ jobs:
       - name: Test (with coverage thresholds)
         run: pnpm test:coverage
 
-  # Runs the demos against real PostgreSQL + MongoDB (throwaway containers started by the script)
+      - name: Coverage summary
+        if: always() && matrix.node-version == '24.x'
+        run: node scripts/coverage-summary.mjs >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage reports
+        if: always() && matrix.node-version == '24.x'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: |
+            shared/coverage/
+            demos/**/coverage/
+          retention-days: 14
+          if-no-files-found: ignore
+
+  # Real databases: the bash smoke test (Days 26–43) and the Testcontainers suite (Day 45)
   smoke:
     needs: verify
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout code
@@ -71,3 +98,61 @@ jobs:
 
       - name: Real-database smoke test
         run: pnpm smoke
+
+      - name: Integration tests (Testcontainers)
+        run: pnpm test:integration
+
+  # The production image (Day 46): build it, run the full compose stack, check it end to end
+  docker:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: demos/intermediate/day_46_docker_containerization
+    env:
+      POSTGRES_USER: ci
+      POSTGRES_PASSWORD: ci-only-password
+      POSTGRES_DB: day46
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image (layer cache shared between runs)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/demo.Dockerfile
+          build-args: PACKAGE=day_46_docker_containerization
+          tags: restful-api/day46:local
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Start the stack and wait until every service is healthy
+        run: docker compose up --no-build --wait --wait-timeout 120
+
+      - name: Check the running API
+        run: |
+          set -euo pipefail
+          curl -fsS localhost:3046/ready
+          curl -fsS -X POST localhost:3046/api/items -H 'Content-Type: application/json' -d '{"name":"from CI"}'
+          curl -fsS localhost:3046/api/items | grep -q 'from CI'
+          test "$(docker inspect --format '{{.Config.User}}' day46-api-1)" = node
+
+      - name: Graceful shutdown exits 0
+        run: |
+          docker compose stop api
+          test "$(docker inspect --format '{{.State.ExitCode}}' day46-api-1)" = 0
+
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
