@@ -11,9 +11,11 @@
     "build": "pnpm -r run build",
     "lint": "eslint .",
     "test": "pnpm -r --if-present run test",
-    "verify": "pnpm build && pnpm lint && pnpm test:coverage",
+    "verify": "pnpm build && pnpm lint && pnpm format:check && pnpm test:coverage",
     "test:coverage": "pnpm -r --if-present run test:coverage",
-    "smoke": "bash scripts/smoke-test.sh"
+    "smoke": "bash scripts/smoke-test.sh",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "keywords": [
     "rest-api",
@@ -27,6 +29,7 @@
     "@eslint/js": "^9.14.0",
     "eslint": "^9.14.0",
     "typescript": "^5.5.3",
-    "typescript-eslint": "^8.14.0"
+    "typescript-eslint": "^8.14.0",
+    "prettier": "^3.3.3"
   }
 }
