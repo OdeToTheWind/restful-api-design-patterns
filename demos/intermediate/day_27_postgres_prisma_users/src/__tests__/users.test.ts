@@ -5,7 +5,10 @@ import { Prisma } from '../../generated/prisma';
 
 jest.mock('../lib/prisma', () => ({
   __esModule: true,
-  default: { user: { findMany: jest.fn(), create: jest.fn(), update: jest.fn(), delete: jest.fn() } },
+  default: {
+    user: { findMany: jest.fn(), create: jest.fn(), update: jest.fn(), delete: jest.fn() },
+    $queryRaw: jest.fn(),
+  },
 }));
 
 const create = jest.mocked(prisma.user.create);
@@ -13,10 +16,24 @@ const update = jest.mocked(prisma.user.update);
 const remove = jest.mocked(prisma.user.delete);
 
 const knownError = (code: string) =>
-  new Prisma.PrismaClientKnownRequestError('Simulated Prisma error', { code, clientVersion: Prisma.prismaVersion.client });
+  new Prisma.PrismaClientKnownRequestError('Simulated Prisma error', {
+    code,
+    clientVersion: Prisma.prismaVersion.client,
+  });
 
 const now = new Date();
-const ada = { id: 'u1', name: 'Ada', email: 'ada@example.com', age: 36, role: 'USER' as const, createdAt: now, updatedAt: now };
+// Valid-format cuids (route params are validated before the database is touched)
+const ID = 'clx0000000000000000000001';
+const MISSING = 'clx0000000000000000000999';
+const ada = {
+  id: ID,
+  name: 'Ada',
+  email: 'ada@example.com',
+  age: 36,
+  role: 'USER' as const,
+  createdAt: now,
+  updatedAt: now,
+};
 
 beforeEach(() => jest.clearAllMocks());
 
@@ -57,16 +74,16 @@ describe('PUT /api/users/:id', () => {
   it('cannot change role through an update', async () => {
     update.mockResolvedValue(ada);
 
-    const res = await request(app).put('/api/users/u1').send({ name: 'Ada L.', role: 'ADMIN' });
+    const res = await request(app).put(`/api/users/${ID}`).send({ name: 'Ada L.', role: 'ADMIN' });
 
     expect(res.status).toBe(200);
-    expect(update).toHaveBeenCalledWith({ where: { id: 'u1' }, data: { name: 'Ada L.' } });
+    expect(update).toHaveBeenCalledWith({ where: { id: ID }, data: { name: 'Ada L.' } });
   });
 
   it('maps a missing record (P2025) to 404', async () => {
     update.mockRejectedValue(knownError('P2025'));
 
-    const res = await request(app).put('/api/users/missing').send({ name: 'X' });
+    const res = await request(app).put(`/api/users/${MISSING}`).send({ name: 'X' });
 
     expect(res.status).toBe(404);
   });
@@ -85,12 +102,12 @@ describe('GET and DELETE /api/users', () => {
 
   it('deletes a user', async () => {
     remove.mockResolvedValue(ada);
-    expect((await request(app).delete('/api/users/u1')).status).toBe(200);
+    expect((await request(app).delete(`/api/users/${ID}`)).status).toBe(200);
   });
 
   it('returns 404 when deleting a missing user', async () => {
     remove.mockRejectedValue(knownError('P2025'));
-    expect((await request(app).delete('/api/users/missing')).status).toBe(404);
+    expect((await request(app).delete(`/api/users/${MISSING}`)).status).toBe(404);
   });
 });
 
@@ -110,5 +127,38 @@ describe('app-level middleware', () => {
     const res = await request(app).get('/api/nope');
     expect(res.status).toBe(404);
     expect(res.body.success).toBe(false);
+  });
+});
+
+describe('route params', () => {
+  it.each(['put', 'delete'] as const)('rejects a malformed id on %s with 400 before querying', async (method) => {
+    const res = await request(app)[method]('/api/users/not-a-cuid').send({ name: 'X' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.errors.id).toBeDefined();
+    expect(update).not.toHaveBeenCalled();
+    expect(remove).not.toHaveBeenCalled();
+  });
+});
+
+describe('health probes', () => {
+  it('GET /health is 200 without touching the database', async () => {
+    const res = await request(app).get('/health');
+    expect(res.status).toBe(200);
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
+  });
+
+  it('GET /ready is 200 when the database answers', async () => {
+    jest.mocked(prisma.$queryRaw).mockResolvedValue([{ '?column?': 1 }] as never);
+    const res = await request(app).get('/ready');
+    expect(res.status).toBe(200);
+    expect(res.body.data.checks).toEqual({ database: 'up' });
+  });
+
+  it('GET /ready is 503 when the database is unreachable', async () => {
+    jest.mocked(prisma.$queryRaw).mockRejectedValue(new Error('connection refused') as never);
+    const res = await request(app).get('/ready');
+    expect(res.status).toBe(503);
+    expect(res.body.errors).toEqual({ database: 'down' });
   });
 });

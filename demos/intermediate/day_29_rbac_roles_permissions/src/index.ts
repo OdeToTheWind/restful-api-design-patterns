@@ -1,9 +1,8 @@
+import { logger, startServer } from '@restful/shared';
 import app from './app';
 import { config } from './config';
+import prisma from './lib/prisma';
 
-const PORT = config.port;
-
-app.listen(PORT, () => {
-  console.log(`🚀 Day 29 Server running on http://localhost:${PORT}`);
-  console.log(`🔐 RBAC + JWT System Ready`);
-});
+// SIGTERM/SIGINT: stop accepting requests, finish in-flight ones, then close the DB pool
+startServer(app, { port: config.port, name: 'Day 29', onShutdown: [() => prisma.$disconnect()] });
+logger.info(`🔐 RBAC + JWT ready — API docs: http://localhost:${config.port}/api/docs`);

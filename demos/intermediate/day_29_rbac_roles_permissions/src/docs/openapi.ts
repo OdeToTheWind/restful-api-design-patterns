@@ -23,7 +23,10 @@ const ErrorResponse = registry.register(
   z.object({
     success: z.literal(false),
     message: z.string(),
-    errors: z.record(z.array(z.string())).nullable().openapi({ description: 'Field errors for 400 validation failures' }),
+    errors: z
+      .record(z.array(z.string()))
+      .nullable()
+      .openapi({ description: 'Field errors for 400 validation failures' }),
     timestamp: z.string().datetime(),
   }),
 );

@@ -13,31 +13,34 @@ export const createUserSchema = z.object({
 
 export const updateUserSchema = createUserSchema.partial();
 
+// Prisma's @default(cuid()) ids
+export const userIdParamsSchema = z.object({ id: z.string().cuid() });
+
 // Prisma errors (P2002 duplicate email, P2025 not found) are mapped to 409/404 by errorHandler
 export class UserController {
   static async getAll(req: Request, res: Response) {
     const users = await prisma.user.findMany({
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
-    ApiResponse.success(res, users, "Users fetched successfully");
+    ApiResponse.success(res, users, 'Users fetched successfully');
   }
 
   static async create(req: Request, res: Response) {
     const user = await prisma.user.create({ data: req.body });
-    ApiResponse.success(res, user, "User created successfully", 201);
+    ApiResponse.success(res, user, 'User created successfully', 201);
   }
 
   static async update(req: Request, res: Response) {
     const user = await prisma.user.update({
       where: { id: req.params.id },
-      data: req.body
+      data: req.body,
     });
 
-    ApiResponse.success(res, user, "User updated successfully");
+    ApiResponse.success(res, user, 'User updated successfully');
   }
 
   static async delete(req: Request, res: Response) {
     await prisma.user.delete({ where: { id: req.params.id } });
-    ApiResponse.success(res, null, "User deleted successfully");
+    ApiResponse.success(res, null, 'User deleted successfully');
   }
 }

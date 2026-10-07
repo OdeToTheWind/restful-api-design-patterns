@@ -19,12 +19,23 @@ jest.mock('../lib/prisma', () => {
 const rt = jest.mocked(prisma.refreshToken);
 const now = Date.now();
 const user = {
-  id: 'user-1', name: 'Ada', email: 'ada@example.com', password: 'hash',
-  role: 'ADMIN' as const, createdAt: new Date(now), updatedAt: new Date(now),
+  id: 'user-1',
+  name: 'Ada',
+  email: 'ada@example.com',
+  password: 'hash',
+  role: 'ADMIN' as const,
+  createdAt: new Date(now),
+  updatedAt: new Date(now),
 };
 const stored = (overrides: Partial<{ revokedAt: Date | null; expiresAt: Date }> = {}) => ({
-  id: 'rt-old', tokenHash: hashToken('old-token'), userId: user.id, replacedById: null,
-  createdAt: new Date(now), revokedAt: null, expiresAt: new Date(now + 60_000), user,
+  id: 'rt-old',
+  tokenHash: hashToken('old-token'),
+  userId: user.id,
+  replacedById: null,
+  createdAt: new Date(now),
+  revokedAt: null,
+  expiresAt: new Date(now + 60_000),
+  user,
   ...overrides,
 });
 
@@ -41,8 +52,13 @@ describe('POST /api/auth/refresh', () => {
     const res = await request(app).post('/api/auth/refresh').send({ refreshToken: 'old-token' });
 
     expect(res.status).toBe(200);
-    expect(rt.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { tokenHash: hashToken('old-token') } }));
-    expect(rt.updateMany).toHaveBeenCalledWith({ where: { id: 'rt-old', revokedAt: null }, data: { revokedAt: expect.any(Date) } });
+    expect(rt.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { tokenHash: hashToken('old-token') } }),
+    );
+    expect(rt.updateMany).toHaveBeenCalledWith({
+      where: { id: 'rt-old', revokedAt: null },
+      data: { revokedAt: expect.any(Date) },
+    });
     expect(rt.update).toHaveBeenCalledWith({ where: { id: 'rt-old' }, data: { replacedById: 'rt-new' } });
     expect(res.body.data.refreshToken).not.toBe('old-token');
     expect(jwt.verify(res.body.data.token, config.jwtSecret)).toMatchObject({ id: 'user-1', role: 'ADMIN' });
@@ -74,7 +90,10 @@ describe('POST /api/auth/refresh', () => {
     const res = await request(app).post('/api/auth/refresh').send({ refreshToken: 'old-token' });
 
     expect(res.status).toBe(401);
-    expect(rt.updateMany).toHaveBeenCalledWith({ where: { userId: 'user-1', revokedAt: null }, data: { revokedAt: expect.any(Date) } });
+    expect(rt.updateMany).toHaveBeenCalledWith({
+      where: { userId: 'user-1', revokedAt: null },
+      data: { revokedAt: expect.any(Date) },
+    });
     expect(rt.create).not.toHaveBeenCalled();
   });
 

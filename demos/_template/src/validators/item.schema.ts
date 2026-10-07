@@ -7,5 +7,8 @@ export const createItemSchema = z.object({
 
 export const updateItemSchema = createItemSchema.partial();
 
+// Prisma's @default(cuid()) ids — malformed ids fail with 400 before reaching the database
+export const itemIdParamsSchema = z.object({ id: z.string().cuid() });
+
 export type CreateItemInput = z.infer<typeof createItemSchema>;
 export type UpdateItemInput = z.infer<typeof updateItemSchema>;

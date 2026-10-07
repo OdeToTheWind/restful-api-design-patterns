@@ -6,7 +6,6 @@ import Todo from '../models/Todo.model';
 // No MongoDB needed: the model's static methods are stubbed per test
 const id = new mongoose.Types.ObjectId().toString();
 const todo = { _id: id, title: 'Write tests', completed: false, createdAt: new Date().toISOString() };
-const castError = () => new mongoose.Error.CastError('ObjectId', 'not-an-id', '_id');
 
 afterEach(() => jest.restoreAllMocks());
 
@@ -74,13 +73,14 @@ describe('PUT /api/todos/:id', () => {
     expect((await request(app).put(`/api/todos/${id}`).send({ completed: 'yes' })).status).toBe(400);
   });
 
-  it('maps an invalid ObjectId (CastError) to 400', async () => {
-    jest.spyOn(Todo, 'findByIdAndUpdate').mockRejectedValue(castError());
+  it('rejects a malformed ObjectId with 400 before querying', async () => {
+    const update = jest.spyOn(Todo, 'findByIdAndUpdate');
 
     const res = await request(app).put('/api/todos/not-an-id').send({ completed: true });
 
     expect(res.status).toBe(400);
-    expect(res.body.message).toBe('Invalid id format');
+    expect(res.body.errors.id).toEqual(['Invalid id format']);
+    expect(update).not.toHaveBeenCalled();
   });
 });
 
@@ -95,9 +95,10 @@ describe('DELETE /api/todos/:id', () => {
     expect((await request(app).delete(`/api/todos/${id}`)).status).toBe(404);
   });
 
-  it('maps an invalid ObjectId (CastError) to 400', async () => {
-    jest.spyOn(Todo, 'findByIdAndDelete').mockRejectedValue(castError());
+  it('rejects a malformed ObjectId with 400 before querying', async () => {
+    const remove = jest.spyOn(Todo, 'findByIdAndDelete');
     expect((await request(app).delete('/api/todos/not-an-id')).status).toBe(400);
+    expect(remove).not.toHaveBeenCalled();
   });
 });
 
@@ -110,5 +111,17 @@ describe('app-level middleware', () => {
     const res = await request(app).get('/api/nope');
     expect(res.status).toBe(404);
     expect(res.body.success).toBe(false);
+  });
+});
+
+describe('health probes', () => {
+  it('GET /health is 200', async () => {
+    expect((await request(app).get('/health')).status).toBe(200);
+  });
+
+  it('GET /ready is 503 while MongoDB is not connected', async () => {
+    const res = await request(app).get('/ready');
+    expect(res.status).toBe(503);
+    expect(res.body.errors).toEqual({ database: 'down' });
   });
 });

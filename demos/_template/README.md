@@ -7,7 +7,9 @@ Starting point for every new day. It already follows the practices fixed during 
 | Request id (`X-Request-Id`) + structured request log | `src/app.ts` (`requestId`, `requestLogger`) |
 | Security headers + CORS allow-list | `src/app.ts` (`helmet`, `cors`) |
 | JSON body size limit | `src/app.ts` (`10kb`) |
-| Zod input validation (unknown keys stripped) | `src/validators/` + `validateBody` |
+| Liveness `/health` + readiness `/ready` (DB ping) | `src/app.ts` (`healthRouter`) |
+| Graceful shutdown (drain requests, disconnect DB) | `src/index.ts` (`startServer`) |
+| Zod validation of body and route params (unknown keys stripped) | `src/validators/` + `validateBody` / `validateParams` |
 | Async errors forwarded to the error handler | `asyncHandler` in `src/routes/` |
 | JSON 404 + global error handler, registered last | `src/app.ts` |
 | One Prisma client per process, per-demo generated client | `src/lib/prisma.ts`, `prisma/schema.prisma` |
@@ -45,7 +47,7 @@ pnpm prisma:migrate              # creates prisma/migrations/
 pnpm dev
 ```
 
-5. Before committing, run this from the repo root: `pnpm verify` (build + lint + tests with coverage). If the day uses a database, add its checks to `scripts/smoke-test.sh` and run `pnpm smoke`.
+5. Before committing, run this from the repo root: `pnpm format`, then `pnpm verify` (build + lint + formatting + tests with coverage). If the day uses a database, add its checks to `scripts/smoke-test.sh` and run `pnpm smoke`.
 
 ## Need a secret (e.g. a JWT key)?
 

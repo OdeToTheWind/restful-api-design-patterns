@@ -17,12 +17,16 @@ describe('GET /api/users/admin (ADMIN only)', () => {
   });
 
   it.each(['USER', 'MODERATOR'])('returns 403 for %s', async (role) => {
-    const res = await request(app).get('/api/users/admin').set('Authorization', `Bearer ${tokenFor(role)}`);
+    const res = await request(app)
+      .get('/api/users/admin')
+      .set('Authorization', `Bearer ${tokenFor(role)}`);
     expect(res.status).toBe(403);
   });
 
   it('returns real stats for ADMIN', async () => {
-    const res = await request(app).get('/api/users/admin').set('Authorization', `Bearer ${tokenFor('ADMIN')}`);
+    const res = await request(app)
+      .get('/api/users/admin')
+      .set('Authorization', `Bearer ${tokenFor('ADMIN')}`);
     expect(res.status).toBe(200);
     expect(res.body.data.stats.totalUsers).toBe(42);
   });
@@ -30,13 +34,17 @@ describe('GET /api/users/admin (ADMIN only)', () => {
 
 describe('GET /api/users (ADMIN or MODERATOR)', () => {
   it('returns 403 for USER and does not query the database', async () => {
-    const res = await request(app).get('/api/users').set('Authorization', `Bearer ${tokenFor('USER')}`);
+    const res = await request(app)
+      .get('/api/users')
+      .set('Authorization', `Bearer ${tokenFor('USER')}`);
     expect(res.status).toBe(403);
     expect(prisma.user.findMany).not.toHaveBeenCalled();
   });
 
   it.each(['ADMIN', 'MODERATOR'])('returns 200 for %s', async (role) => {
-    const res = await request(app).get('/api/users').set('Authorization', `Bearer ${tokenFor(role)}`);
+    const res = await request(app)
+      .get('/api/users')
+      .set('Authorization', `Bearer ${tokenFor(role)}`);
     expect(res.status).toBe(200);
   });
 });

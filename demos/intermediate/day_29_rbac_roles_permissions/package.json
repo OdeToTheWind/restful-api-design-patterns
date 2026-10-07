@@ -43,6 +43,8 @@
     "supertest": "^7.0.0",
     "ts-jest": "^29.2.5",
     "@types/cors": "^2.8.17",
-    "@types/swagger-ui-express": "^4.1.8"
+    "@types/swagger-ui-express": "^4.1.8",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
   }
 }

@@ -1,11 +1,8 @@
+import { logger, startServer } from '@restful/shared';
 import app from './app';
 import { config } from './config';
+import prisma from './lib/prisma';
 
-const PORT = config.port;
-
-app.listen(PORT, () => {
-  console.log(`🚀 Day 28 Server running on http://localhost:${PORT}`);
-  console.log(`🔐 JWT Authentication System is Ready`);
-  console.log(`📝 Register : POST /api/auth/register`);
-  console.log(`🔑 Login    : POST /api/auth/login`);
-});
+// SIGTERM/SIGINT: stop accepting requests, finish in-flight ones, then close the DB pool
+startServer(app, { port: config.port, name: 'Day 28', onShutdown: [() => prisma.$disconnect()] });
+logger.info('🔐 JWT auth ready — POST /api/auth/register | /login | /refresh | /logout');

@@ -1,9 +1,5 @@
+import { startServer } from '@restful/shared';
 import app from './app';
 import { config } from './config';
 
-const PORT = config.port;
-
-app.listen(PORT, () => {
-  console.log(`🚀 Day 30 Server running on http://localhost:${PORT}`);
-  console.log(`🛡️  Global Error Handling Active`);
-});
+startServer(app, { port: config.port, name: 'Day 30' });

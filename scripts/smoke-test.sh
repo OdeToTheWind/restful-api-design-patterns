@@ -23,7 +23,7 @@ SERVER_PID=""
 FAIL=0
 
 export JWT_SECRET="smoke-test-secret-$(date +%s)-0123456789abcdef"
-export NODE_ENV=development AUTH_RATE_LIMIT=1000 LOG_LEVEL=error
+export NODE_ENV=development AUTH_RATE_LIMIT=1000 LOGIN_ACCOUNT_LIMIT=1000 LOG_LEVEL=error
 
 cleanup() {
   [ -n "$SERVER_PID" ] && kill "$SERVER_PID" 2>/dev/null
@@ -55,7 +55,15 @@ start() { # dir port
   for _ in $(seq 1 75); do curl -s "localhost:$2/" >/dev/null && return 0; sleep 0.2; done
   echo "  FAIL $1 did not start:"; cat "$TMP/$1.log"; FAIL=1
 }
-stop() { kill "$SERVER_PID" 2>/dev/null; wait "$SERVER_PID" 2>/dev/null; SERVER_PID=""; }
+stop() { # SIGTERM → the server must drain, close its DB connection and exit 0
+  kill -TERM "$SERVER_PID" 2>/dev/null; wait "$SERVER_PID" 2>/dev/null; local code=$?
+  SERVER_PID=""
+  check "graceful shutdown on SIGTERM (exit 0)" 0 "$code"
+}
+probes() { # port — liveness and readiness against the real database
+  check "/health → 200" 200 "$(req GET "localhost:$1/health")"
+  check "/ready → 200 (database up)" 200 "$(req GET "localhost:$1/ready")"
+}
 migrate() { (cd "$DEMOS/$1" && npx prisma migrate deploy >"$TMP/$1.migrate.log" 2>&1) || { echo "  FAIL migrations for $1:"; cat "$TMP/$1.migrate.log"; FAIL=1; }; }
 
 # ---- databases -------------------------------------------------------------
@@ -77,6 +85,7 @@ start day_26_mongodb_mongoose_todos 4026; B=localhost:4026/api/todos
 check "create todo → 201" 201 "$(req POST $B '{"title":"Smoke test","owner":"x"}')"
 ID=$(field data._id)
 check "unknown field dropped" undefined "$(field data.owner)"
+probes 4026
 check "X-Request-Id header set" true "$([ -n "$(header x-request-id)" ] && echo true || echo false)"
 check "list todos → 200" 200 "$(req GET $B)"
 check "update todo → 200" 200 "$(req PUT "$B/$ID" '{"completed":true}')"
@@ -99,7 +108,9 @@ UID27=$(field data.id)
 check "duplicate email → 409 (P2002)" 409 "$(req POST $B '{"name":"Ada","email":"ada@example.com"}')"
 req PUT "$B/$UID27" '{"role":"ADMIN","age":37}' >/dev/null
 check "role ignored on update" USER "$(field data.role)"
-check "update missing → 404 (P2025)" 404 "$(req PUT $B/nope '{"age":1}')"
+check "update missing → 404 (P2025)" 404 "$(req PUT $B/clx0000000000000000000999 '{"age":1}')"
+check "malformed id → 400" 400 "$(req PUT $B/nope '{"age":1}')"
+probes 4027
 check "list users → 200" 200 "$(req GET $B)"
 check "delete user → 200" 200 "$(req DELETE "$B/$UID27")"
 check "delete again → 404" 404 "$(req DELETE "$B/$UID27")"
@@ -133,7 +144,17 @@ for DAY in 28 29; do
   check "logout → 200" 200 "$(req POST $B/logout "{\"refreshToken\":\"$REFRESH3\"}")"
   check "refresh after logout → 401" 401 "$(req POST $B/refresh "{\"refreshToken\":\"$REFRESH3\"}")"
   check "only hashes stored in DB" 0 "$(docker exec "$PG_CONTAINER" psql -U postgres -d "day$DAY" -tAc "SELECT count(*) FROM refresh_tokens WHERE \"tokenHash\" IN ('$REFRESH1','$REFRESH2','$REFRESH3')")"
+  probes "40$DAY"
   check "helmet header" nosniff "$(curl -s -D - -o /dev/null "localhost:40$DAY/" | tr -d '\r' | awk -F': ' 'tolower($1)=="x-content-type-options"{print $2}')"
+  if [ "$DAY" = 28 ]; then
+    # Restart with a low per-account limit to see the lock against the real app
+    stop
+    LOGIN_ACCOUNT_LIMIT=2 start "$DIR" "40$DAY"
+    req POST $B/login '{"email":"ada@example.com","password":"wrong-1"}' >/dev/null
+    req POST $B/login '{"email":"ada@example.com","password":"wrong-2"}' >/dev/null
+    check "3rd failed login for one account → 429" 429 "$(req POST $B/login '{"email":"ada@example.com","password":"wrong-3"}')"
+    check "other accounts unaffected → 401" 401 "$(req POST $B/login '{"email":"x@example.com","password":"wrong-pass"}')"
+  fi
   if [ "$DAY" = 29 ]; then
     U=localhost:4029/api/users
     req POST $B/login '{"email":"ada@example.com","password":"correct-horse"}' >/dev/null; USER_TOKEN=$(field data.token)
@@ -154,6 +175,7 @@ done
 # ---- Day 30 ----------------------------------------------------------------
 echo "== Day 30 (global error middleware via @restful/shared)"
 start day_30_global_error_middleware 4030; B=localhost:4030/api/test
+probes 4030
 check "AppError → 400" 400 "$(req GET $B/bad-request)"
 check "crash → generic 500" "Internal Server Error" "$(req GET $B/server-error >/dev/null; field message)"
 check "unknown route → JSON 404" false "$(req GET localhost:4030/api/nope >/dev/null; field success)"

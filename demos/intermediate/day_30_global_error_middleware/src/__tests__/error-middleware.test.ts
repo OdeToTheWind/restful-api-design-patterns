@@ -51,3 +51,10 @@ describe('request context', () => {
     expect((await request(app).get('/')).headers['x-content-type-options']).toBe('nosniff');
   });
 });
+
+describe('health probes', () => {
+  it('GET /health and GET /ready are 200 (no dependencies to check)', async () => {
+    expect((await request(app).get('/health')).status).toBe(200);
+    expect((await request(app).get('/ready')).body.data).toEqual({ status: 'ready', checks: {} });
+  });
+});

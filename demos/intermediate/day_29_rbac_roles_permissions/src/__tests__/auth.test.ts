@@ -54,7 +54,9 @@ describe('POST /api/auth/register', () => {
     findUnique.mockResolvedValue(null);
     create.mockResolvedValue(dbUser() as never);
 
-    await request(app).post('/api/auth/register').send({ name: 'Ada', email: 'ada@example.com', password: 'correct-horse' });
+    await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'Ada', email: 'ada@example.com', password: 'correct-horse' });
 
     expect(create.mock.calls[0][0].select).not.toHaveProperty('password');
   });
@@ -74,7 +76,9 @@ describe('POST /api/auth/register', () => {
   it('returns 409 when the email is taken', async () => {
     findUnique.mockResolvedValue(dbUser());
 
-    const res = await request(app).post('/api/auth/register').send({ name: 'Ada', email: 'ada@example.com', password: 'correct-horse' });
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'Ada', email: 'ada@example.com', password: 'correct-horse' });
 
     expect(res.status).toBe(409);
   });
@@ -83,7 +87,9 @@ describe('POST /api/auth/register', () => {
     jest.spyOn(console, 'error').mockImplementation(() => undefined);
     findUnique.mockRejectedValue(new Error('connection refused'));
 
-    const res = await request(app).post('/api/auth/register').send({ name: 'Ada', email: 'ada@example.com', password: 'correct-horse' });
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'Ada', email: 'ada@example.com', password: 'correct-horse' });
 
     expect(res.status).toBe(500);
     expect(res.body.message).toBe('Internal Server Error');
@@ -94,7 +100,9 @@ describe('POST /api/auth/login', () => {
   it('returns a JWT whose role comes from the database', async () => {
     findUnique.mockResolvedValue(dbUser({ role: 'ADMIN' }));
 
-    const res = await request(app).post('/api/auth/login').send({ email: 'ada@example.com', password: 'correct-horse' });
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'ada@example.com', password: 'correct-horse' });
 
     expect(res.status).toBe(200);
     expect(res.body.data.user).not.toHaveProperty('password');
@@ -109,7 +117,9 @@ describe('POST /api/auth/login', () => {
   ])('returns the same 401 for %s', async (_case, user) => {
     findUnique.mockResolvedValue(user);
 
-    const res = await request(app).post('/api/auth/login').send({ email: 'ada@example.com', password: 'correct-horse' });
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'ada@example.com', password: 'correct-horse' });
 
     expect(res.status).toBe(401);
     expect(res.body.message).toBe('Invalid credentials');
@@ -119,7 +129,9 @@ describe('POST /api/auth/login', () => {
     findUnique.mockResolvedValue(null);
     const compare = jest.spyOn(bcrypt, 'compare');
 
-    const res = await request(app).post('/api/auth/login').send({ email: 'nobody@example.com', password: 'correct-horse' });
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'nobody@example.com', password: 'correct-horse' });
 
     expect(res.status).toBe(401);
     expect(compare).toHaveBeenCalledTimes(1);

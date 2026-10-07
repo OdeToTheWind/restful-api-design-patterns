@@ -2,9 +2,10 @@ import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
-import { errorHandler, notFoundHandler, requestId, requestLogger } from '@restful/shared';
+import { errorHandler, healthRouter, notFoundHandler, requestId, requestLogger } from '@restful/shared';
 import apiRoutes from './routes';
 import { config } from './config';
+import prisma from './lib/prisma';
 import { openApiDocument } from './docs/openapi';
 
 const app: Application = express();
@@ -18,6 +19,9 @@ app.use(cors({ origin: config.corsOrigins }));
 
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+
+// Liveness (/health) and readiness (/ready) probes for Docker, load balancers, uptime checks
+app.use(healthRouter({ database: () => prisma.$queryRaw`SELECT 1` }));
 
 // API docs: raw spec for tools/codegen, Swagger UI for humans
 app.get('/api/docs/openapi.json', (_req: Request, res: Response) => {

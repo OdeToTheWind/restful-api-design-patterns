@@ -27,7 +27,11 @@ const signAccessToken = (user: AuthUser): string => {
 const createRefreshToken = async (userId: string, db: Prisma.TransactionClient = prisma) => {
   const token = randomBytes(48).toString('base64url');
   const record = await db.refreshToken.create({
-    data: { tokenHash: hashToken(token), userId, expiresAt: new Date(Date.now() + config.refreshTokenTtlDays * DAY_MS) },
+    data: {
+      tokenHash: hashToken(token),
+      userId,
+      expiresAt: new Date(Date.now() + config.refreshTokenTtlDays * DAY_MS),
+    },
   });
   return { token, id: record.id };
 };

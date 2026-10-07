@@ -1,20 +1,17 @@
 import mongoose from 'mongoose';
+import { logger, startServer } from '@restful/shared';
 import app from './app';
 import { config } from './config';
-
-const PORT = config.port;
 
 // Connect first, then accept traffic — no requests hit a disconnected DB
 mongoose
   .connect(config.mongoUri)
   .then(() => {
-    console.log('✅ MongoDB Connected');
-    app.listen(PORT, () => {
-      console.log(`🚀 Day 26 Server running on http://localhost:${PORT}`);
-      console.log(`📦 MongoDB Mode Activated`);
-    });
+    logger.info('✅ MongoDB Connected');
+    // SIGTERM/SIGINT: stop accepting requests, finish in-flight ones, then disconnect
+    startServer(app, { port: config.port, name: 'Day 26', onShutdown: [() => mongoose.disconnect()] });
   })
-  .catch((err: unknown) => {
-    console.error('❌ MongoDB Connection Error:', err);
+  .catch((error: unknown) => {
+    logger.error('❌ MongoDB Connection Error', { error });
     process.exit(1);
   });
