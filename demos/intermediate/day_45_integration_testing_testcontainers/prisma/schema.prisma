@@ -1,0 +1,24 @@
+generator client {
+  provider = "prisma-client-js"
+  // Per-demo output: demos share one @prisma/client install in the pnpm workspace,
+  // so the default location would be overwritten by whichever demo generated last.
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Behaviour here depends on PostgreSQL itself (array type, GIN index, unique constraint),
+// which is exactly what mocked unit tests can't verify — see src/__integration__.
+model Bookmark {
+  id        String   @id @default(cuid())
+  url       String   @unique
+  title     String
+  tags      String[]
+  createdAt DateTime @default(now())
+
+  @@index([tags], type: Gin)
+  @@map("bookmarks")
+}
