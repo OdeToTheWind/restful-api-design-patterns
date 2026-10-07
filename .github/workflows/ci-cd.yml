@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
-  test:
+  verify:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -16,13 +16,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # Important for Turbo to compare changes
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: 9
+        uses: pnpm/action-setup@v4   # version comes from "packageManager" in package.json
 
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
@@ -30,9 +26,45 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: 'pnpm'
 
+      # Also builds @restful/shared (prepare) and generates each demo's Prisma client (postinstall)
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Run Tasks via Turbo
-        # This will run lint and test across all workspaces in parallel
-        run: pnpm turbo run lint test --continue
+      - name: Audit production dependencies
+        run: pnpm audit --prod --audit-level high
+
+      - name: Build (type-check every workspace package)
+        run: pnpm build
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Test (with coverage thresholds)
+        run: pnpm test:coverage
+
+  # Runs the demos against real PostgreSQL + MongoDB (throwaway containers started by the script)
+  smoke:
+    needs: verify
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Real-database smoke test
+        run: pnpm smoke
