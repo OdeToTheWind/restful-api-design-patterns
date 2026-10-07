@@ -93,3 +93,11 @@ describe('route params and health probes', () => {
     expect((await request(app).get('/ready')).status).toBe(503);
   });
 });
+
+describe('API docs', () => {
+  it('serves an OpenAPI 3.1 document covering the item routes', async () => {
+    const res = await request(app).get('/api/docs/openapi.json');
+    expect(res.body.openapi).toBe('3.1.0');
+    expect(Object.keys(res.body.paths).sort()).toEqual(['/api/items', '/api/items/{id}']);
+  });
+});

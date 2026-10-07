@@ -1,10 +1,11 @@
 import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import { errorHandler, healthRouter, notFoundHandler, requestId, requestLogger } from '@restful/shared';
+import { docsRouter, errorHandler, healthRouter, notFoundHandler, requestId, requestLogger } from '@restful/shared';
 import apiRoutes from './routes';
 import { config } from './config';
 import prisma from './lib/prisma';
+import { openApiDocument } from './docs/openapi';
 
 const app: Application = express();
 
@@ -21,12 +22,15 @@ app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 // Liveness (/health) and readiness (/ready) probes for Docker, load balancers, uptime checks
 app.use(healthRouter({ database: () => prisma.$queryRaw`SELECT 1` }));
 
+// API docs: /api/docs (Swagger UI) and /api/docs/openapi.json
+app.use(docsRouter(openApiDocument));
+
 app.use('/api', apiRoutes);
 
 app.get('/', (req: Request, res: Response) => {
   res.json({
     message: 'Welcome to Day XX - <Topic>',
-    documentation: '/api/items',
+    documentation: '/api/docs',
     day: 0,
   });
 });

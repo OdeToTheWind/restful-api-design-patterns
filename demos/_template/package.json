@@ -1,7 +1,7 @@
 {
   "name": "demo_template",
   "version": "1.0.0",
-  "description": "Starting point for new demos — copy, rename, then build the day's topic on top",
+  "description": "Starting point for new demos \u2014 copy, rename, then build the day's topic on top",
   "private": true,
   "main": "dist/index.js",
   "type": "commonjs",
@@ -14,7 +14,7 @@
     "prisma:studio": "prisma studio",
     "postinstall": "prisma generate",
     "test": "jest",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage --coverageReporters=text --coverageReporters=lcov --coverageReporters=json-summary"
   },
   "license": "MIT",
   "dependencies": {
