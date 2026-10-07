@@ -33,12 +33,18 @@ const buildApp = () => {
   app.get('/app-error', () => {
     throw new AppError('Nope', 418, { field: 'x' });
   });
-  app.get('/async-reject', asyncHandler(async () => {
-    throw new AppError('Async failure', 422);
-  }));
-  app.get('/bug', asyncHandler(async () => {
-    throw new Error('secret internal detail');
-  }));
+  app.get(
+    '/async-reject',
+    asyncHandler(async () => {
+      throw new AppError('Async failure', 422);
+    }),
+  );
+  app.get(
+    '/bug',
+    asyncHandler(async () => {
+      throw new Error('secret internal detail');
+    }),
+  );
   app.post('/validate', validateBody(z.object({ name: z.string().min(2) })), (req, res) => {
     ApiResponse.success(res, req.body);
   });
@@ -97,7 +103,9 @@ describe('errorHandler', () => {
   });
 
   it('rejects oversized bodies with 413', async () => {
-    const res = await request(buildApp()).post('/validate').send({ name: 'x'.repeat(2000) });
+    const res = await request(buildApp())
+      .post('/validate')
+      .send({ name: 'x'.repeat(2000) });
     expect(res.status).toBe(413);
   });
 });

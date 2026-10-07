@@ -5,4 +5,6 @@ export * from './error-handler';
 export * from './validate';
 export * from './logger';
 export * from './request-context';
+export * from './health';
+export * from './server';
 export * from './types/express';

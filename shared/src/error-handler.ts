@@ -23,7 +23,11 @@ export const normalizeError = (err: unknown): NormalizedError => {
 
   // body-parser errors (malformed JSON, payload too large) carry a safe `status` + `expose`
   if (hasProp(err, 'status') && hasProp(err, 'expose') && err.expose === true && typeof err.status === 'number') {
-    return { statusCode: err.status, message: String(hasProp(err, 'message') ? err.message : 'Bad Request'), errors: null };
+    return {
+      statusCode: err.status,
+      message: String(hasProp(err, 'message') ? err.message : 'Bad Request'),
+      errors: null,
+    };
   }
 
   // Prisma known request errors
@@ -36,7 +40,11 @@ export const normalizeError = (err: unknown): NormalizedError => {
   if (hasProp(err, 'name')) {
     if (err.name === 'CastError') return { statusCode: 400, message: 'Invalid id format', errors: null };
     if (err.name === 'ValidationError') {
-      return { statusCode: 400, message: String(hasProp(err, 'message') ? err.message : 'Validation failed'), errors: null };
+      return {
+        statusCode: 400,
+        message: String(hasProp(err, 'message') ? err.message : 'Validation failed'),
+        errors: null,
+      };
     }
   }
 

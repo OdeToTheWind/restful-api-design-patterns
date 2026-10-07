@@ -25,7 +25,8 @@ export const requestLogger: RequestHandler = (req, res, next) => {
 
   res.on('finish', () => {
     const durationMs = Number(process.hrtime.bigint() - start) / 1e6;
-    const level = res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'info';
+    const isProbe = req.path === '/health' || req.path === '/ready';
+    const level = res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : isProbe ? 'debug' : 'info';
     logger.log(level, `${req.method} ${req.originalUrl} ${res.statusCode}`, {
       requestId: req.id,
       method: req.method,
