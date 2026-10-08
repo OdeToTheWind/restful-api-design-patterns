@@ -1,0 +1,27 @@
+generator client {
+  provider = "prisma-client-js"
+  // Per-demo output: demos share one @prisma/client install in the pnpm workspace,
+  // so the default location would be overwritten by whichever demo generated last.
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Article {
+  id        String    @id @default(cuid())
+  // Unique among NON-deleted articles only — a partial unique index that Prisma's schema
+  // language can't express, so it lives in the migration SQL (see prisma/migrations).
+  slug      String
+  title     String
+  body      String
+  // null = active; a timestamp = in the trash since then
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([deletedAt])
+  @@map("articles")
+}
