@@ -15,6 +15,7 @@ const env = loadEnv(
     MAIL_FROM: z.string().default('Day 40 <no-reply@example.com>'),
     EMAIL_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(5),
     CORS_ORIGIN: envFields.csv,
+    ADMIN_API_KEY: z.string().default('day40-admin-secret-key'),
   }),
 );
 
@@ -26,4 +27,5 @@ export const config = {
   mailFrom: env.MAIL_FROM,
   maxAttempts: env.EMAIL_MAX_ATTEMPTS,
   corsOrigins: env.CORS_ORIGIN,
+  adminApiKey: env.ADMIN_API_KEY,
 };

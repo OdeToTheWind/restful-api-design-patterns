@@ -172,7 +172,24 @@ describe('email processor (worker side)', () => {
 });
 
 describe('Dead-letter endpoints', () => {
-  it('lists failed jobs and allows re-queuing', async () => {
+  const adminKey = 'day40-admin-secret-key';
+
+  it('rejects unauthenticated requests with 401', async () => {
+    const { queue } = fakeQueue();
+    const app = createApp({ queue });
+
+    const noKeyRes = await request(app).get('/api/admin/emails/failed');
+    expect(noKeyRes.status).toBe(401);
+    expectToMatchSpec(noKeyRes, 'get', '/api/admin/emails/failed');
+
+    const wrongKeyRes = await request(app)
+      .post('/api/admin/emails/failed/failed-job-1/retry')
+      .set('X-Admin-Key', 'wrong-key');
+    expect(wrongKeyRes.status).toBe(401);
+    expectToMatchSpec(wrongKeyRes, 'post', '/api/admin/emails/failed/{jobId}/retry');
+  });
+
+  it('lists failed jobs and allows re-queuing with valid admin key', async () => {
     const { queue, jobs } = fakeQueue();
     jobs.set('failed-job-1', {
       id: 'failed-job-1',
@@ -182,13 +199,15 @@ describe('Dead-letter endpoints', () => {
     });
     const app = createApp({ queue });
 
-    const listRes = await request(app).get('/api/admin/emails/failed');
+    const listRes = await request(app).get('/api/admin/emails/failed').set('X-Admin-Key', adminKey);
     expect(listRes.status).toBe(200);
     expect(listRes.body.data.count).toBe(1);
     expect(listRes.body.data.jobs[0].jobId).toBe('failed-job-1');
     expectToMatchSpec(listRes, 'get', '/api/admin/emails/failed');
 
-    const retryRes = await request(app).post('/api/admin/emails/failed/failed-job-1/retry');
+    const retryRes = await request(app)
+      .post('/api/admin/emails/failed/failed-job-1/retry')
+      .set('X-Admin-Key', adminKey);
     expect(retryRes.status).toBe(200);
     expect(retryRes.body.data.retried).toBe(true);
     expectToMatchSpec(retryRes, 'post', '/api/admin/emails/failed/{jobId}/retry');
@@ -204,10 +223,14 @@ describe('Dead-letter endpoints', () => {
     });
     const app = createApp({ queue });
 
-    const notFoundRes = await request(app).post('/api/admin/emails/failed/missing-job/retry');
+    const notFoundRes = await request(app)
+      .post('/api/admin/emails/failed/missing-job/retry')
+      .set('X-Admin-Key', adminKey);
     expect(notFoundRes.status).toBe(404);
 
-    const conflictRes = await request(app).post('/api/admin/emails/failed/active-job/retry');
+    const conflictRes = await request(app)
+      .post('/api/admin/emails/failed/active-job/retry')
+      .set('X-Admin-Key', adminKey);
     expect(conflictRes.status).toBe(409);
   });
 });

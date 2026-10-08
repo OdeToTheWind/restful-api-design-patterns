@@ -84,22 +84,52 @@ ensure_built() {
 }
 
 start_infrastructure() {
-  echo "Starting throwaway containers for smoke test…"
-  docker run -d --rm --name "$PG_CONTAINER" -e POSTGRES_PASSWORD=smoke -p "127.0.0.1:$PG_PORT:5432" postgres:16 >/dev/null || exit 1
-  docker run -d --rm --name "$MONGO_CONTAINER" -p "127.0.0.1:$MONGO_PORT:27017" mongo:7 >/dev/null || exit 1
-  docker run -d --rm --name "$REDIS_CONTAINER" -p "127.0.0.1:$REDIS_PORT:6379" redis:7-alpine >/dev/null || exit 1
-  docker run -d --rm --name "$QUEUE_REDIS_CONTAINER" -p "127.0.0.1:$QUEUE_REDIS_PORT:6379" redis:7-alpine >/dev/null || exit 1
+  local needed=("$@")
+  [ ${#needed[@]} -eq 0 ] && needed=(pg mongo redis queue-redis s3 mailpit)
 
-  printf '{"identities":[{"name":"smoke","credentials":[{"accessKey":"smoke-key","secretKey":"smoke-secret-123"}],"actions":["Admin","Read","Write","List","Tagging"]}]}' >"$TMP/s3.json"
-  chmod 644 "$TMP/s3.json"
-  docker run -d --rm --name "$S3_CONTAINER" -v "$TMP/s3.json:/etc/seaweedfs/s3.json:ro" -p "127.0.0.1:$S3_PORT:8333" \
-    chrislusf/seaweedfs server -s3 -s3.config=/etc/seaweedfs/s3.json >/dev/null || exit 1
-  docker run -d --rm --name "$MAILPIT_CONTAINER" -p "127.0.0.1:$MAILPIT_SMTP_PORT:1025" -p "127.0.0.1:$MAILPIT_HTTP_PORT:8025" axllent/mailpit >/dev/null || exit 1
+  echo "Starting throwaway containers (${needed[*]}) for smoke test…"
+  for svc in "${needed[@]}"; do
+    case "$svc" in
+      pg)
+        docker run -d --rm --name "$PG_CONTAINER" -e POSTGRES_PASSWORD=smoke -p "127.0.0.1:$PG_PORT:5432" postgres:16 >/dev/null || exit 1
+        ;;
+      mongo)
+        docker run -d --rm --name "$MONGO_CONTAINER" -p "127.0.0.1:$MONGO_PORT:27017" mongo:7 >/dev/null || exit 1
+        ;;
+      redis)
+        docker run -d --rm --name "$REDIS_CONTAINER" -p "127.0.0.1:$REDIS_PORT:6379" redis:7-alpine >/dev/null || exit 1
+        ;;
+      queue-redis)
+        docker run -d --rm --name "$QUEUE_REDIS_CONTAINER" -p "127.0.0.1:$QUEUE_REDIS_PORT:6379" redis:7-alpine >/dev/null || exit 1
+        ;;
+      s3)
+        printf '{"identities":[{"name":"smoke","credentials":[{"accessKey":"smoke-key","secretKey":"smoke-secret-123"}],"actions":["Admin","Read","Write","List","Tagging"]}]}' >"$TMP/s3.json"
+        chmod 644 "$TMP/s3.json"
+        docker run -d --rm --name "$S3_CONTAINER" -v "$TMP/s3.json:/etc/seaweedfs/s3.json:ro" -p "127.0.0.1:$S3_PORT:8333" \
+          chrislusf/seaweedfs server -s3 -s3.config=/etc/seaweedfs/s3.json >/dev/null || exit 1
+        ;;
+      mailpit)
+        docker run -d --rm --name "$MAILPIT_CONTAINER" -p "127.0.0.1:$MAILPIT_SMTP_PORT:1025" -p "127.0.0.1:$MAILPIT_HTTP_PORT:8025" axllent/mailpit >/dev/null || exit 1
+        ;;
+    esac
+  done
 
-  timeout 120 sh -c "until docker exec $PG_CONTAINER pg_isready -U postgres -h 127.0.0.1 >/dev/null 2>&1; do sleep 1; done" || { echo "Postgres did not start"; exit 1; }
-  timeout 120 sh -c "until docker exec $MONGO_CONTAINER mongosh --quiet --eval 'db.runCommand({ping:1}).ok' >/dev/null 2>&1; do sleep 1; done" || { echo "MongoDB did not start"; exit 1; }
-  timeout 120 sh -c "until [ \"\$(curl -s -o /dev/null -w %{http_code} localhost:$S3_PORT)\" != 000 ]; do sleep 1; done" || { echo "S3 storage did not start"; exit 1; }
-  timeout 60 sh -c "until curl -sf localhost:$MAILPIT_HTTP_PORT/api/v1/messages >/dev/null; do sleep 1; done" || { echo "Mailpit did not start"; exit 1; }
+  for svc in "${needed[@]}"; do
+    case "$svc" in
+      pg)
+        timeout 120 sh -c "until docker exec $PG_CONTAINER pg_isready -U postgres -h 127.0.0.1 >/dev/null 2>&1; do sleep 1; done" || { echo "Postgres did not start"; exit 1; }
+        ;;
+      mongo)
+        timeout 120 sh -c "until docker exec $MONGO_CONTAINER mongosh --quiet --eval 'db.runCommand({ping:1}).ok' >/dev/null 2>&1; do sleep 1; done" || { echo "MongoDB did not start"; exit 1; }
+        ;;
+      s3)
+        timeout 120 sh -c "until [ \"\$(curl -s -o /dev/null -w %{http_code} localhost:$S3_PORT)\" != 000 ]; do sleep 1; done" || { echo "S3 storage did not start"; exit 1; }
+        ;;
+      mailpit)
+        timeout 60 sh -c "until curl -sf localhost:$MAILPIT_HTTP_PORT/api/v1/messages >/dev/null; do sleep 1; done" || { echo "Mailpit did not start"; exit 1; }
+        ;;
+    esac
+  done
 }
 
 create_databases() {

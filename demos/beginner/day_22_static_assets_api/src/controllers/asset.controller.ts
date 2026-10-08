@@ -22,12 +22,20 @@ export class AssetController {
   }
 
   static deleteAsset(req: Request, res: Response) {
+    // Post-snapshot fix (#36): prevent path traversal by sanitizing filename and restricting to uploads/
     const { filename } = req.params;
-    const filePath = path.join(UPLOADS_DIR, filename);
+    const safeFilename = path.basename(filename || '');
+    const uploadsRoot = path.resolve(UPLOADS_DIR);
+    const targetPath = path.resolve(uploadsRoot, safeFilename);
 
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-      ApiResponse.success(res, { filename }, "Asset deleted successfully");
+    if (!safeFilename || safeFilename === '.' || safeFilename === '..' || !targetPath.startsWith(uploadsRoot + path.sep)) {
+      ApiResponse.error(res, "Invalid file path", 400);
+      return;
+    }
+
+    if (fs.existsSync(targetPath)) {
+      fs.unlinkSync(targetPath);
+      ApiResponse.success(res, { filename: safeFilename }, "Asset deleted successfully");
     } else {
       ApiResponse.error(res, "File not found", 404);
     }

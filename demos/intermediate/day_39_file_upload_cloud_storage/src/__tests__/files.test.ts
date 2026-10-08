@@ -7,6 +7,7 @@ import prisma from '../lib/prisma';
 import { s3 } from '../lib/storage';
 import { openApiDocument } from '../docs/openapi';
 import { Prisma } from '../../generated/prisma';
+import { runCleanup } from '../cleanup';
 
 jest.mock('../lib/prisma', () => ({
   __esModule: true,
@@ -157,7 +158,7 @@ describe('download, list and delete', () => {
   });
 });
 
-describe('POST /api/files/cleanup-abandoned', () => {
+describe('runCleanup (src/cleanup.ts)', () => {
   it('removes expired PENDING uploads and deletes their storage objects', async () => {
     const expiredFile = file({
       id: 'expired-1',
@@ -168,14 +169,12 @@ describe('POST /api/files/cleanup-abandoned', () => {
     jest.mocked(prisma.file.findMany).mockResolvedValue([expiredFile]);
     s3Mock.on(DeleteObjectCommand).resolves({});
 
-    const res = await request(app).post('/api/files/cleanup-abandoned');
+    const res = await runCleanup();
 
-    expect(res.status).toBe(200);
-    expect(res.body.data.cleanedCount).toBe(1);
-    expect(res.body.data.cleanedIds).toEqual(['expired-1']);
+    expect(res.cleanedCount).toBe(1);
+    expect(res.cleanedIds).toEqual(['expired-1']);
     expect(s3Mock.commandCalls(DeleteObjectCommand)).toHaveLength(1);
     expect(prisma.file.delete).toHaveBeenCalledWith({ where: { id: 'expired-1' } });
-    expectToMatchSpec(res, 'post', '/api/files/cleanup-abandoned');
   });
 });
 

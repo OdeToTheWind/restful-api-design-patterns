@@ -7,7 +7,7 @@ dotenv.config();
 // Validated once at startup; any invalid value stops the app with a list of every problem
 const env = loadEnv(
   z.object({
-    PORT: envFields.port(3029),
+    PORT: envFields.port(3030),
     NODE_ENV: envFields.nodeEnv,
     // Allowed browser origins, comma-separated. Empty = no cross-origin access.
     CORS_ORIGIN: envFields.csv,

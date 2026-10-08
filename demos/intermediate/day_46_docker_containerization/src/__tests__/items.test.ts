@@ -1,7 +1,10 @@
 import request from 'supertest';
-import app from '../app';
+import { createContractMatcher } from '@restful/shared/testing';
+import app, { createApp } from '../app';
+import { config } from '../config';
 import prisma from '../lib/prisma';
 import { Prisma } from '../../generated/prisma';
+import { openApiDocument } from '../docs/openapi';
 
 // No database needed: the Prisma singleton is replaced with mocks
 jest.mock('../lib/prisma', () => ({
@@ -12,6 +15,7 @@ jest.mock('../lib/prisma', () => ({
   },
 }));
 
+const expectToMatchSpec = createContractMatcher(openApiDocument);
 const now = new Date();
 const ID = 'clx0000000000000000000001';
 const item = { id: ID, name: 'First', createdAt: now, updatedAt: now };
@@ -29,6 +33,7 @@ describe('/api/items', () => {
     const res = await request(app).get('/api/items');
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveLength(1);
+    expectToMatchSpec(res, 'get', '/api/items');
   });
 
   it('creates from whitelisted fields only', async () => {
@@ -36,27 +41,35 @@ describe('/api/items', () => {
     const res = await request(app).post('/api/items').send({ name: ' First ', id: 'client-chosen' });
     expect(res.status).toBe(201);
     expect(prisma.item.create).toHaveBeenCalledWith({ data: { name: 'First' } });
+    expectToMatchSpec(res, 'post', '/api/items');
   });
 
   it('rejects invalid input with 400', async () => {
     const res = await request(app).post('/api/items').send({ name: '' });
     expect(res.status).toBe(400);
     expect(prisma.item.create).not.toHaveBeenCalled();
+    expectToMatchSpec(res, 'post', '/api/items');
   });
 
   it('updates an item', async () => {
     jest.mocked(prisma.item.update).mockResolvedValue(item);
-    expect((await request(app).put(`/api/items/${ID}`).send({ name: 'Renamed' })).status).toBe(200);
+    const res = await request(app).put(`/api/items/${ID}`).send({ name: 'Renamed' });
+    expect(res.status).toBe(200);
+    expectToMatchSpec(res, 'put', '/api/items/{id}');
   });
 
   it('maps a missing record (P2025) to 404', async () => {
     jest.mocked(prisma.item.delete).mockRejectedValue(knownError('P2025'));
-    expect((await request(app).delete('/api/items/clx0000000000000000000999')).status).toBe(404);
+    const res = await request(app).delete('/api/items/clx0000000000000000000999');
+    expect(res.status).toBe(404);
+    expectToMatchSpec(res, 'delete', '/api/items/{id}');
   });
 
   it('deletes an item', async () => {
     jest.mocked(prisma.item.delete).mockResolvedValue(item);
-    expect((await request(app).delete(`/api/items/${ID}`)).status).toBe(200);
+    const res = await request(app).delete(`/api/items/${ID}`);
+    expect(res.status).toBe(200);
+    expectToMatchSpec(res, 'delete', '/api/items/{id}');
   });
 });
 
@@ -73,8 +86,22 @@ describe('app-level middleware', () => {
     expect(res.body.success).toBe(false);
   });
 
-  it('respects X-Forwarded-Proto and X-Forwarded-For headers when trust proxy is active', async () => {
+  it('ignores X-Forwarded headers when trust proxy is false (default)', async () => {
     const res = await request(app)
+      .get('/api/proxy-info')
+      .set('X-Forwarded-Proto', 'https')
+      .set('X-Forwarded-For', '203.0.113.195');
+
+    expect(res.status).toBe(200);
+    expect(res.body.protocol).toBe('http');
+    expect(res.body.secure).toBe(false);
+    expect(res.body.ip).not.toBe('203.0.113.195');
+    expect(res.body.forwardedProto).toBe('https');
+  });
+
+  it('respects X-Forwarded-Proto and X-Forwarded-For headers when trust proxy is active', async () => {
+    const proxyApp = createApp({ ...config, trustProxy: true });
+    const res = await request(proxyApp)
       .get('/api/proxy-info')
       .set('X-Forwarded-Proto', 'https')
       .set('X-Forwarded-For', '203.0.113.195');
@@ -85,9 +112,15 @@ describe('app-level middleware', () => {
     expect(res.body.ip).toBe('203.0.113.195');
     expect(res.body.forwardedProto).toBe('https');
 
-    const directRes = await request(app).get('/api/proxy-info');
+    const directRes = await request(proxyApp).get('/api/proxy-info');
     expect(directRes.status).toBe(200);
     expect(directRes.body.forwardedProto).toBeNull();
+  });
+
+  it('disables /api/proxy-info in production', async () => {
+    const prodApp = createApp({ ...config, nodeEnv: 'production' });
+    const res = await request(prodApp).get('/api/proxy-info');
+    expect(res.status).toBe(404);
   });
 });
 
@@ -96,6 +129,7 @@ describe('route params and health probes', () => {
     const res = await request(app).delete('/api/items/not-a-cuid');
     expect(res.status).toBe(400);
     expect(prisma.item.delete).not.toHaveBeenCalled();
+    expectToMatchSpec(res, 'delete', '/api/items/{id}');
   });
 
   it('GET /health is 200', async () => {

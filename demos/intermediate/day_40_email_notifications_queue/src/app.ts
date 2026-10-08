@@ -20,6 +20,8 @@ import { openApiDocument } from './docs/openapi';
 import { EmailRequest, emailRequestSchema, idempotencyKeySchema, jobIdParamsSchema } from './emails/schema';
 import type { EmailQueue } from './queue/email.queue';
 
+import { createAdminRouter } from './routes/admin.routes';
+
 export interface AppDependencies {
   queue: EmailQueue;
   readinessChecks?: Record<string, HealthCheck>;
@@ -90,48 +92,9 @@ export const createApp = ({ queue, readinessChecks = {} }: AppDependencies): App
   );
 
   /**
-   * Dead-letter visibility: list jobs that failed permanently after exhausting all retries.
+   * Admin routes (dead-letter visibility and re-queue) protected by X-Admin-Key
    */
-  app.get(
-    '/api/admin/emails/failed',
-    asyncHandler(async (_req: Request, res: Response) => {
-      const failedJobs = await queue.getFailed(0, 100);
-      const jobs = await Promise.all(
-        failedJobs.map(async (j) => ({
-          jobId: j.id!,
-          type: j.data.type,
-          to: j.data.to,
-          attemptsMade: j.attemptsMade,
-          failedReason: j.failedReason ?? null,
-          failedAt: j.finishedOn ? new Date(j.finishedOn).toISOString() : null,
-        })),
-      );
-      ApiResponse.success(res, { count: jobs.length, jobs }, 'Failed email jobs fetched');
-    }),
-  );
-
-  /**
-   * Dead-letter re-queue: retry a failed job.
-   */
-  app.post(
-    '/api/admin/emails/failed/:jobId/retry',
-    validateParams(jobIdParamsSchema),
-    asyncHandler(async (req: Request, res: Response) => {
-      const job = await queue.getJob(req.params.jobId);
-      if (!job) throw new AppError('Email job not found', 404);
-      const state = await job.getState();
-      if (state !== 'failed') {
-        throw new AppError(`Only failed jobs can be retried (current state: ${state})`, 409);
-      }
-      await job.retry();
-      ApiResponse.success(
-        res,
-        { jobId: job.id!, retried: true, statusUrl: `/api/emails/${job.id}` },
-        'Job re-queued for delivery',
-        200,
-      );
-    }),
-  );
+  app.use('/api/admin', createAdminRouter(queue));
 
   app.get('/', (_req: Request, res: Response) => {
     res.json({ message: 'Welcome to Day 40 - Email Notifications with a Queue', documentation: '/api/docs', day: 40 });

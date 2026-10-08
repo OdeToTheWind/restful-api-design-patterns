@@ -23,12 +23,12 @@ The template is part of the pnpm workspace, so CI builds, lints and tests it lik
 ## Start a new day
 
 ```bash
-pnpm new-day 50 database_transactions "Database Transactions"   # from the repo root
+pnpm new-day 51 hateoas "HATEOAS / Hypermedia Controls"         # from the repo root
 pnpm install                                                    # links @restful/shared, generates the Prisma client
-cd demos/intermediate/day_50_database_transactions
+cd demos/advanced/day_51_hateoas
 cp .env.example .env && docker compose up -d
 pnpm prisma:migrate                                             # after editing prisma/schema.prisma
-pnpm dev                                                        # http://localhost:3050/api/docs
+pnpm dev                                                        # http://localhost:3051/api/docs
 ```
 
 `scripts/new-day.mjs` copies this folder (skipping `node_modules`, `dist`, `generated`), gives the package a unique name, sets the port to `3000 + day`, and renames the database, container and `Day XX` placeholders. Then replace the placeholder `Item` resource with the day's own models, validators, routes and `src/docs/openapi.ts` entries.

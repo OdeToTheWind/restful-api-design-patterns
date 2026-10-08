@@ -9,6 +9,6 @@ This day has no application code: the work lives in the pipeline.
 
 | Job | What it proves |
 |---|---|
-| `verify` (Node 20 + 24) | audit, type-check, lint, formatting, 300+ tests with coverage gates |
+| `verify` (Node 22 + 24) | audit, type-check, lint, formatting, 440+ tests with coverage gates |
 | `smoke` | every intermediate demo against real PostgreSQL, MongoDB and Redis; Day 45's Testcontainers suite |
 | `docker` | the Day 46 production image builds, the compose stack becomes healthy, the API works and shuts down cleanly |

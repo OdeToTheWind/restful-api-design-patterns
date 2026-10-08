@@ -12,6 +12,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET="${1:-all}"
 
 case "$TARGET" in
+  beginner)
+    exec "$SCRIPT_DIR/smoke/beginner-smoke.sh"
+    ;;
   phase1|core)
     exec "$SCRIPT_DIR/smoke/phase-1-core.sh"
     ;;
@@ -23,6 +26,7 @@ case "$TARGET" in
     ;;
   all|"")
     echo "Running all smoke test phases in sequence..."
+    "$SCRIPT_DIR/smoke/beginner-smoke.sh" || exit 1
     "$SCRIPT_DIR/smoke/phase-1-core.sh" || exit 1
     "$SCRIPT_DIR/smoke/phase-2-services.sh" || exit 1
     "$SCRIPT_DIR/smoke/phase-3-advanced.sh" || exit 1
@@ -33,7 +37,7 @@ case "$TARGET" in
     ;;
   *)
     echo "Unknown smoke test target: $TARGET"
-    echo "Valid options: all, phase1 (core), phase2 (services), phase3 (advanced)"
+    echo "Valid options: all, beginner, phase1 (core), phase2 (services), phase3 (advanced)"
     exit 1
     ;;
 esac

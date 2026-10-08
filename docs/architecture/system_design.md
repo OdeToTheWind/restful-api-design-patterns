@@ -313,3 +313,9 @@ Each record is short: what was decided, why, and what it costs.
 - **Decision:** Transfers use an interactive transaction at `Serializable` isolation, with a conditional debit (`balance >= amount`) and a `CHECK (balance >= 0)` constraint as a backstop. Serialization failures are retried with jittered exponential backoff, and still-conflicting requests get `503 + Retry-After`. `Idempotency-Key` makes retries safe. Edits use optimistic locking (`version` → `ETag`, `If-Match` required).
 - **Why:** No lost updates, no double spending, no duplicate transfers, and honest, retryable errors under load.
 - **Cost:** Retries add latency under heavy contention on a single row.
+
+### ADR-032 — Major dependency upgrade strategy for Advanced Phase (Days 51–75)
+
+- **Decision:** Preserve Days 1–50 as verified, immutable learning snapshots locked to their current LTS baselines (Node 22 runtime, Express 4, Zod 3, Prisma 5, Jest 29). Beginning with the Advanced Phase (Day 51 onwards), `demos/_template` will serve as the launchpad for new major upgrades (Express 5, Prisma 6+, Zod 4, Jest 30/Vitest) either via a dedicated migration day or forward-only adoption.
+- **Why:** Retroactively rewriting 50 existing snapshots across beginner and intermediate tiers introduces extensive regression risk, risks breaking past lessons, and diverts effort from mastering new architectural patterns. Treating past days as immutable snapshots reflects how production legacy microservices coexist with newer services.
+- **Cost:** Monorepo package dependencies will have dual majors across phases until a repository-wide codemod is intentionally scheduled.

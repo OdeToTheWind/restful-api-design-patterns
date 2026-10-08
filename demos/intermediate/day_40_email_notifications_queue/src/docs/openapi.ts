@@ -57,11 +57,19 @@ registry.registerPath({
     404: api.error('Unknown or expired job'),
   },
 });
+registry.registerComponent('securitySchemes', 'AdminApiKey', {
+  type: 'apiKey',
+  in: 'header',
+  name: 'X-Admin-Key',
+  description: 'Shared secret required for operational admin endpoints',
+});
+
 registry.registerPath({
   method: 'get',
   path: '/api/admin/emails/failed',
   tags: ['Admin'],
   summary: 'Dead-letter visibility: list failed email jobs',
+  security: [{ AdminApiKey: [] }],
   responses: {
     200: api.success(
       'Failed jobs',
@@ -79,6 +87,7 @@ registry.registerPath({
         ),
       }),
     ),
+    401: api.error('Unauthorized: missing or invalid admin key'),
   },
 });
 registry.registerPath({
@@ -86,9 +95,11 @@ registry.registerPath({
   path: '/api/admin/emails/failed/{jobId}/retry',
   tags: ['Admin'],
   summary: 'Dead-letter re-queue: retry a failed email job',
+  security: [{ AdminApiKey: [] }],
   request: { params: jobIdParamsSchema },
   responses: {
     200: api.success('Retried', z.object({ jobId: z.string(), retried: z.boolean(), statusUrl: z.string() })),
+    401: api.error('Unauthorized: missing or invalid admin key'),
     404: api.error('Job not found'),
     409: api.error('Job is not in failed state'),
   },

@@ -13,7 +13,7 @@ ensure_built day_26_mongodb_mongoose_todos day_27_postgres_prisma_users day_28_j
   day_29_rbac_roles_permissions day_30_global_error_middleware day_31_swagger_openapi_docs \
   day_32_advanced_pagination_filter_sort day_33_caching_redis_intro
 
-start_infrastructure
+start_infrastructure pg mongo redis
 create_databases day27 day28 day29 day31 day32 day33
 
 # ---- Day 26 ----------------------------------------------------------------
@@ -108,6 +108,10 @@ for DAY in 28 29; do
   fi
   stop
 done
+
+echo "== Startup without JWT_SECRET (Day 28)"
+OUT=$(cd "$DEMOS/day_28_jwt_authentication" && JWT_SECRET='' node -e "require('./dist/config')" 2>&1)
+case "$OUT" in *"Invalid environment configuration"*"JWT_SECRET"*) echo "  PASS refuses to start";; *) echo "  FAIL started without secret"; FAIL=1;; esac
 
 # ---- Day 30 ----------------------------------------------------------------
 echo "== Day 30 (global error middleware via @restful/shared)"

@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: [20.x, 24.x]
+        node-version: [22.x, 24.x]
 
     steps:
       - name: Checkout code
@@ -71,7 +71,7 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
 
-  # Real databases: the bash smoke test (Days 26–43) and the Testcontainers suite (Day 45)
+  # Real databases: the bash smoke test (Days 26–50) and the Testcontainers suite (Day 45)
   smoke:
     needs: verify
     runs-on: ubuntu-latest
@@ -95,6 +95,9 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      - name: 'Smoke test — Beginner (Days 1–25)'
+        run: pnpm smoke:beginner
 
       - name: 'Smoke test — Phase 1: Core (Days 26–33)'
         run: pnpm smoke:phase1

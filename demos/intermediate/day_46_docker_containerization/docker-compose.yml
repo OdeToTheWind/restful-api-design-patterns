@@ -49,6 +49,7 @@ services:
       <<: *database-url
       PORT: 3046
       CORS_ORIGIN: ${CORS_ORIGIN:-}
+      TRUST_PROXY: 'true'
     ports:
       - '127.0.0.1:3046:3046'
     depends_on:
@@ -74,8 +75,8 @@ services:
   proxy:
     image: caddy:2-alpine
     ports:
-      - '${CADDY_HTTP_PORT:-8080}:80'
-      - '${CADDY_HTTPS_PORT:-8443}:443'
+      - '127.0.0.1:${CADDY_HTTP_PORT:-8080}:80'
+      - '127.0.0.1:${CADDY_HTTPS_PORT:-8443}:443'
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

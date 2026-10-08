@@ -16,7 +16,7 @@ const env = loadEnv(
     TRUST_PROXY: z
       .string()
       .optional()
-      .default('true')
+      .default('false')
       .transform((v) => v === 'true' || v === '1'),
   }),
 );
