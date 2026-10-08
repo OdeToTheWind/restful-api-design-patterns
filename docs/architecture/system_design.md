@@ -111,6 +111,7 @@ Middleware order in `app.ts` matters. `notFoundHandler` and `errorHandler` must 
 | `healthRouter(checks)` | `GET /health` (liveness) and `GET /ready` (runs each check with a timeout; 503 naming the failing dependency) |
 | `startServer(app, options)` | `listen()` + SIGTERM/SIGINT handling: stop accepting, drain in-flight requests, run `onShutdown` hooks (e.g. `prisma.$disconnect()`), exit; forced exit after a timeout |
 | `requestId`, `requestLogger` | `X-Request-Id` on every response (reuses a safe incoming id) + one log line per request with status and duration |
+| `runWithLogContext`, `addToLogContext`, `getLogContext`, `redact` | Per-request log context (AsyncLocalStorage) added to every log line; secrets masked before writing |
 | `createApiRegistry`, `generateOpenApiDocument`, `docsRouter`, `jsonContent`, `successEnvelope` | Document a demo's API from its Zod schemas; serve `/api/docs` + `/api/docs/openapi.json` |
 | `offsetPaginationQuery`, `cursorPaginationQuery`, `paginateOffset`, `paginateCursor`, `encodeCursor`/`decodeCursor` | Offset and keyset pagination with consistent `meta` |
 | `loadEnv`, `envFields` | Validate the whole environment with one Zod schema at startup; reusable field types (port, csv, flag, secret) |
@@ -258,3 +259,57 @@ Each record is short: what was decided, why, and what it costs.
 - **Decision:** `.env.<env>.local` → `.env.local` → `.env.<env>` → `.env`, with real environment variables winning. Per-environment defaults are committed; secrets never are. One Zod schema validates everything at startup, including production-only rules, and the app receives a typed config object.
 - **Why:** Misconfiguration fails at boot with a complete list, and nothing reads `process.env` after startup.
 - **Cost:** Every new setting is added to the schema and `.env.example`.
+
+### ADR-023 — Request-scoped log context and redaction in the shared logger
+
+- **Decision:** `requestId` runs each request inside an AsyncLocalStorage context. The shared logger adds that context (`requestId`, `userId`, …) to every entry, and masks sensitive keys (password, token, secret, cookie, authorization, API keys) at any depth.
+- **Why:** Logs from deep inside services are traceable without threading ids through every function, and a stray `logger.info('…', { body })` can't leak credentials.
+- **Cost:** Only structured fields are protected: messages must never interpolate data.
+
+### ADR-024 — Soft delete in a Prisma client extension
+
+- **Decision:** Soft-deletable models get a `deletedAt` column. A client extension hides deleted rows from reads and turns `delete` into "set `deletedAt`". The unfiltered client is used only by the trash. Uniqueness among active rows uses a hand-written partial unique index.
+- **Why:** Applied in one place, so no query can forget it.
+- **Cost:** Prisma's schema can't express partial indexes; generated migrations must not drop it.
+
+### ADR-025 — Uploads go straight to object storage via pre-signed URLs
+
+- **Decision:** The API validates the declared file, stores metadata as `PENDING` under a random key and returns a short-lived pre-signed PUT URL. `complete` verifies the stored object (`HeadObject`) before marking it `READY`; downloads use pre-signed GET URLs. The S3 client computes checksums only when required.
+- **Why:** Large bodies never pass through the API, and the stored object, not the client's claim, is the source of truth.
+- **Cost:** A two-step client flow, and orphaned `PENDING` records need a cleanup job later.
+
+### ADR-026 — Slow side effects run in a queue
+
+- **Decision:** Emails are enqueued (BullMQ on Redis); the API returns `202 Accepted` with a status URL. A separate worker sends them, retrying temporary failures with exponential backoff and stopping on permanent ones (`UnrecoverableError`). `Idempotency-Key` maps to a fixed job id.
+- **Why:** A slow or broken mail server can never slow down or fail an HTTP request.
+- **Cost:** One more process to run and monitor, and eventual rather than immediate delivery.
+
+### ADR-027 — Webhooks: verify raw bytes, process exactly once
+
+- **Decision:** Webhook routes read the raw body. They verify `HMAC-SHA256(secret, "${t}.${body}")` in constant time within a 5-minute window, and record each `eventId` under a unique constraint in the same transaction as its effect.
+- **Why:** Providers deliver at least once and attackers can replay requests; the signature and the unique id together make processing authentic and exactly once.
+- **Cost:** Webhook routes are mounted before the JSON parser.
+
+### ADR-028 — URI versioning with announced deprecation
+
+- **Decision:** Breaking changes get a new `/api/vN`. Versions share the domain model and differ only in mappers. Deprecated versions send `Deprecation`, `Sunset` and `Link: rel="successor-version"` on every response and return `410 Gone` after the sunset date. Each version has its own OpenAPI document.
+- **Why:** Clients get machine-readable warning and a fixed date, and logic is never duplicated per version.
+- **Cost:** Old mappers live until the sunset date.
+
+### ADR-029 — Choose the test double by what the test needs to know
+
+- **Decision:** Fakes (in-memory implementations) by default; stubs for inputs like time; spies or mocks only when the interaction itself is the requirement (e.g. "refund exactly once"). Boundary tests for rules, since coverage only shows that lines ran.
+- **Why:** Tests that check behaviour survive refactors; tests that check calls break on them.
+- **Cost:** Fakes must be kept behaviourally faithful to the real adapters.
+
+### ADR-030 — Load relations with the query, and measure round trips
+
+- **Decision:** Lists load relations and counts with `select`/`include`/`_count` in one operation, never per row. Day 48 counts Prisma operations per request (`X-Prisma-Operations`) to make N+1 visible.
+- **Why:** N+1 is invisible in development with three rows and fatal in production with three thousand.
+- **Cost:** None; the counter is a teaching aid.
+
+### ADR-031 — Money moves in transactions with conditional updates
+
+- **Decision:** Transfers use an interactive transaction at `Serializable` isolation, with a conditional debit (`balance >= amount`) and a `CHECK (balance >= 0)` constraint as a backstop. Serialization failures are retried with jittered exponential backoff, and still-conflicting requests get `503 + Retry-After`. `Idempotency-Key` makes retries safe. Edits use optimistic locking (`version` → `ETag`, `If-Match` required).
+- **Why:** No lost updates, no double spending, no duplicate transfers, and honest, retryable errors under load.
+- **Cost:** Retries add latency under heavy contention on a single row.

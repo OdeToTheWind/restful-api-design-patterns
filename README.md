@@ -73,8 +73,8 @@ Whether you're a beginner solidifying fundamentals or an experienced engineer re
 │   └── real-world/             # Demos 76–100
 └── shared/                     # @restful/shared — used by Day 26 onward
     └── src/                    # ApiResponse, AppError, asyncHandler, errorHandler,
-                                # notFoundHandler, validateBody/Query/Params, logger,
-                                # requestId, requestLogger, healthRouter, startServer,
+                                # notFoundHandler, validateBody/Query/Params, logger (request
+                                # context + redaction), requestId, requestLogger, healthRouter, startServer,
                                 # typed req.user / req.id
 ```
 ---
@@ -115,23 +115,23 @@ Whether you're a beginner solidifying fundamentals or an experienced engineer re
 | 31  | Swagger OpenAPI Docs                      | ✅ Completed      | Spec-first contract → validation, OpenAPI 3.1, Swagger UI and a generated typed client; drift check in CI |
 | 32  | Advanced Pagination Filter Sort           | ✅ Completed      | Offset + cursor (keyset) pagination, whitelisted sorting, filters, matching indexes |
 | 33  | Caching Redis Intro                       | ✅ Completed      | Redis cache-aside, write invalidation with list versioning, `X-Cache`, graceful fallback when Redis is down |
-| 34  | Winston Logging                           | 📋 Planned      | Winston structured logging with context |
+| 34  | Log Context                               | ✅ Completed      | AsyncLocalStorage request context in every log line, automatic secret redaction, per-environment levels |
 | 35  | Seeding Migrations                        | ✅ Completed      | Deterministic, idempotent Prisma seeds with profiles; `db:reset`; snapshot-tested seed data |
-| 36  | Soft Delete Pattern                       | 📋 Planned      | Soft delete implementation |
+| 36  | Soft Delete                               | ✅ Completed      | Prisma client extension (reads hide deleted rows, delete → trash), restore, partial unique index |
 | 37  | Repository Service Layer                  | ✅ Completed      | Controller → service → repository, injected dependencies, in-memory repository for tests |
 | 38  | DTOs Mappers                              | ✅ Completed      | Public / private / admin views via explicit mappers; input DTOs; leaks caught by contract tests |
-| 39  | File Upload Cloud Storage                 | 📋 Planned      | Multer + cloud storage (S3 simulation) |
-| 40  | Email Notifications Service               | 📋 Planned      | Email service integration |
-| 41  | demo-41-webhook-endpoints                         | 📋 Planned      | Secure webhook receiving & validation |
-| 42  | demo-42-api-versioning-uri                        | 📋 Planned      | URI-based API versioning (/v1/, /v2/) |
+| 39  | File Upload Cloud Storage                 | ✅ Completed      | Pre-signed S3 URLs (SeaweedFS locally), direct-to-storage uploads verified with HeadObject |
+| 40  | Email Notifications Queue                 | ✅ Completed      | BullMQ worker, 202 Accepted + status URL, retries with backoff, idempotency keys, Mailpit |
+| 41  | Webhook Endpoints                         | ✅ Completed      | HMAC signatures over the raw body, replay protection, exactly-once processing |
+| 42  | API Versioning (URI)                      | ✅ Completed      | v1/v2 side by side, Deprecation/Sunset/Link headers, 410 after sunset, docs per version |
 | 43  | Cookie-based Sessions                     | ✅ Completed      | Refresh token in httpOnly SameSite cookie, double-submit CSRF, list/revoke sessions |
-| 44  | demo-44-unit-testing-jest                         | 📋 Planned      | Unit testing with Jest |
+| 44  | Test Doubles and Coverage                 | ✅ Completed      | Dummy/stub/spy/mock/fake on a checkout with compensation; why coverage isn't correctness |
 | 45  | Integration Testing (Testcontainers)      | ✅ Completed      | Real PostgreSQL per test run: migrations, constraints, array queries, GIN index |
 | 46  | Docker Containerization                   | ✅ Completed      | Multi-stage non-root image via `pnpm deploy`; compose stack with migrate job and health checks |
 | 47  | GitHub Actions CI                         | ✅ Completed      | Concurrency, least privilege, coverage summary + artifacts, real-DB and Docker jobs |
-| 48  | demo-48-relationships-one-many-many               | 📋 Planned      | Database relationships & population |
+| 48  | Database Relationships                    | ✅ Completed      | 1:N, M:N (explicit + implicit), nested writes, N+1 made visible with an operation counter |
 | 49  | Environment Configs                       | ✅ Completed      | Layered `.env` files, one Zod schema with production rules, typed config, feature flags, redaction |
-| 50  | demo-50-database-transactions-basics              | 📋 Planned      | Database transaction handling |
+| 50  | Database Transactions                     | ✅ Completed      | Atomic transfers, Serializable + retry, idempotency keys, optimistic locking (ETag/If-Match) |
 | 51  | demo-51-hateoas-links                             | 📋 Planned      | HATEOAS – Hypermedia as the Engine of Application State |
 | 52  | demo-52-redis-caching-advanced                    | 📋 Planned      | Advanced Redis caching & invalidation |
 | 53  | demo-53-rate-limiting-redis                       | 📋 Planned      | Distributed rate limiting with Redis |
@@ -189,7 +189,7 @@ Whether you're a beginner solidifying fundamentals or an experienced engineer re
 | Level          | Demos   | Focus                                              | Status       |
 |----------------|---------|----------------------------------------------------|--------------|
 | **Beginner**   | 01–25   | Core REST concepts, HTTP mastery, basic Express | ✅ Completed |
-| **Intermediate**| 26–50  | Databases, Auth, Testing, Layered Architecture | 🔄 In Progress (16/25) |
+| **Intermediate**| 26–50  | Databases, Auth, Testing, Layered Architecture | ✅ Completed |
 | **Advanced**   | 51–75   | Scalability, Observability, Resilience Patterns | ⏳ Planned |
 | **Real-World** | 76–100  | Full Production Applications | ⏳ Planned |
 
@@ -266,7 +266,7 @@ Detailed per-demo docs → [docs/progress/](docs/progress/)
    pnpm test:coverage   # same, with coverage thresholds (CI uses this)
    pnpm format          # Prettier (shared/, intermediate demos, template, configs)
    pnpm verify          # build + lint + format:check + test:coverage
-   pnpm smoke           # real Postgres + MongoDB + Redis in throwaway containers (needs Docker; run after build)
+   pnpm smoke           # real Postgres, MongoDB, Redis, S3 storage and SMTP in throwaway containers (needs Docker; run after build)
    pnpm test:integration # Testcontainers suites (needs Docker)
    ```
 

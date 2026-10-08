@@ -3,7 +3,7 @@
 **Project**: RESTful API Design Patterns — 100 Days Challenge  
 **Author**: Bhargavi Badal  
 **Assessed On**: October 7, 2026  
-**Last Updated**: October 8, 2026 — remediation pass ([Section 8](#8-implementation-log-remediation-pass)), three follow-up rounds, and Days 31–49 of the curriculum; pending items in [Section 9](#9-next-steps)  
+**Last Updated**: October 8, 2026 — remediation pass ([Section 8](#8-implementation-log-remediation-pass)), three follow-up rounds, and Days 31–50 of the curriculum (intermediate phase complete); pending items in [Section 9](#9-next-steps)  
 **Repository**: [OdeToTheWind/restful-api-design-patterns](https://github.com/OdeToTheWind/restful-api-design-patterns)
 
 ---
@@ -28,12 +28,12 @@
 
 ## 1. Executive Summary
 
-This is a **well-structured, disciplined learning project** with a clear commitment to building RESTful API design skills step by step. 41 of the 100 planned days are complete, covering Express basics through JWT auth, RBAC, caching, layered architecture, cookie sessions, Docker and CI.
+This is a **well-structured, disciplined learning project** with a clear commitment to building RESTful API design skills step by step. 50 of the 100 planned days are complete — the beginner and intermediate phases — covering Express basics through auth, RBAC, caching, queues, webhooks, versioning, transactions, Docker and CI.
 
 The original assessment found critical gaps in security, TypeScript discipline, monorepo setup and testing. Four rounds of work on October 7, 2026 resolved **every tracked issue** and the first ten of the follow-up Next Steps. Current state:
-- The workspace installs, audits, builds, lints, format-checks and tests cleanly: 42 packages, **327 passing tests**, coverage gates enforced.
+- The workspace installs, audits, builds, lints, format-checks and tests cleanly: 51 packages, **443 passing tests**, coverage gates enforced.
 - Every intermediate demo serves OpenAPI docs, and its real responses are contract-tested against them.
-- Days 26–49 pass a **150-check** smoke test against real PostgreSQL, MongoDB and Redis, including graceful SIGTERM shutdown.
+- Days 26–50 pass a **210-check** smoke test against real PostgreSQL, MongoDB, Redis, S3-compatible storage and SMTP, including graceful SIGTERM shutdown and 20 concurrent money transfers.
 - A Testcontainers suite (Day 45) and the production Docker image (Day 46) are tested in CI on every pull request.
 
 **Overall Score: 7.2 → 9.2 / 10**
@@ -47,7 +47,7 @@ The original assessment found critical gaps in security, TypeScript discipline, 
 | Security Practices | 5.0 | 9.0 | ✅ Strong | No secret fallbacks or role escalation; validation, per-IP + per-account login throttling, helmet/CORS, timing-safe login, 15-min access + rotating hashed refresh tokens, audited deps |
 | Documentation Consistency | 8.0 | 9.0 | ✅ Strong | README accurate (Days 31–40 status corrected); 12 ADRs; contract-tested OpenAPI + Swagger UI; reflections carry follow-up notes |
 | Monorepo Configuration | 4.5 | 9.0 | ✅ Strong | pnpm workspace, demo template, CI (audit, coverage, real-DB smoke job), Dependabot, `node_modules` untracked |
-| Testing | 1.0 | 9.5 | ✅ Strong | 327 tests + Testcontainers suite, OpenAPI contract tests on every demo, 70–80% coverage gates, 150 real-database checks and a Docker job in CI |
+| Testing | 1.0 | 9.5 | ✅ Strong | 443 tests + Testcontainers suite, OpenAPI contract tests on every demo, 70–80% coverage gates, 210 real-infrastructure checks and a Docker job in CI |
 
 > Scores are judgement-based (the overall score is not a plain average), matching how the original report scored.
 
@@ -59,8 +59,8 @@ The original assessment found critical gaps in security, TypeScript discipline, 
 
 ```
 Total Planned:   100 demos
-Completed:        41 days (41%)
-Planned (todo):   59 days (59%)
+Completed:        50 days (50%)
+Planned (todo):   50 days (50%)
 ```
 
 ### Phase Breakdown
@@ -68,7 +68,7 @@ Planned (todo):   59 days (59%)
 | Phase | Range | Demos Done | Status |
 |---|---|---|---|
 | **Beginner** | Days 1–25 | 25/25 | ✅ Complete |
-| **Intermediate** | Days 26–50 | 16/25 | 🔄 In Progress |
+| **Intermediate** | Days 26–50 | 25/25 | ✅ Complete |
 | **Advanced** | Days 51–75 | 0/25 | 📋 Planned |
 | **Real-World** | Days 76–100 | 0/25 | 📋 Planned |
 
@@ -96,7 +96,7 @@ Planned (todo):   59 days (59%)
 | Rate Limiting | 24 | ✅ |
 | MVC Refactor (Capstone) | 25 | ✅ |
 
-### Topic Coverage Map (Intermediate — In Progress)
+### Topic Coverage Map (Intermediate Phase ✅)
 
 | Topic | Day | Status | Automated tests |
 |---|---|---|---|
@@ -116,15 +116,15 @@ Planned (todo):   59 days (59%)
 | Docker containerization | 46 | ✅ | ✅ 12 tests + CI `docker` job |
 | GitHub Actions CI hardening | 47 | ✅ | — (the pipeline itself) |
 | Environment configs | 49 | ✅ | ✅ 18 tests |
-| Log context | 34 | 📋 | — |
-| Soft delete | 36 | 📋 | — |
-| File upload to cloud storage | 39 | 📋 | — |
-| Email notifications | 40 | 📋 | — |
-| Webhooks | 41 | 📋 | — |
-| API versioning | 42 | 📋 | — |
-| Test doubles + coverage | 44 | 📋 | — |
-| DB relationships | 48 | 📋 | — |
-| DB transactions | 50 | 📋 | — |
+| Log context + redaction | 34 | ✅ | ✅ 7 tests (+ shared log-context suite) |
+| Soft delete | 36 | ✅ | ✅ 10 tests |
+| File upload to cloud storage | 39 | ✅ | ✅ 12 tests |
+| Email notifications via a queue | 40 | ✅ | ✅ 13 tests |
+| Webhooks | 41 | ✅ | ✅ 20 tests |
+| API versioning | 42 | ✅ | ✅ 9 tests |
+| Test doubles + coverage | 44 | ✅ | ✅ 16 tests |
+| DB relationships | 48 | ✅ | ✅ 8 tests |
+| DB transactions | 50 | ✅ | ✅ 14 tests |
 
 Every database-backed intermediate demo is also covered by the real-database smoke test (`pnpm smoke`).
 
@@ -376,7 +376,7 @@ CI runs `pnpm audit --prod --audit-level high` (currently 0 known vulnerabilitie
 | 2 | RBAC allows user self-promotion to ADMIN | 🔴 Critical | Day 29 | ✅ Fixed + tested |
 | 3 | Real `.env` files committed to git | 🔴 Critical | Days 28, 29 | ➖ Incorrect — never committed |
 | 4 | `shared/` directory is completely empty | 🟠 High | `shared/` | ✅ `@restful/shared` package |
-| 5 | No test files (0%) | 🟠 High | Entire repo | ✅ 327 tests, coverage gates in CI |
+| 5 | No test files (0%) | 🟠 High | Entire repo | ✅ 443 tests, coverage gates in CI |
 | 6 | `PrismaClient` instantiated per controller | 🟠 High | Days 27–29 | ✅ Per-demo singleton |
 | 7 | Missing `try/catch` in controller async ops | 🟠 High | Days 26–30 | ✅ `asyncHandler` + `errorHandler` |
 | 8 | `(req as any).user` — type safety bypassed | 🟡 Medium | Days 28, 29 | ✅ Typed augmentation + guard |
@@ -517,32 +517,20 @@ Only pending work is listed here. Completed work is recorded in the [issue track
 
 #### 🔴 Immediate Repository Actions
 
-- [ ] **Merge the Days 31–49 pull request** (squash) once its `verify`, `smoke` and `docker` checks pass.
-- [ ] **Require the new `docker` check on `main`:** Settings → Branches → `main` → add `docker` next to `verify (20.x)`, `verify (24.x)` and `smoke`, so the production image must build and pass before anything merges.
+- [ ] **Merge the open pull requests in order** (squash): Days 31–49 first, then Days 34–50, which is built on top of it.
+- [ ] **Require the `docker` check on `main`:** Settings → Branches → `main` → add `docker` next to `verify (20.x)`, `verify (24.x)` and `smoke`, so the production image must build and pass before anything merges.
 - [ ] **Rebase any unpushed local commits** onto the new `main` (`git pull --rebase origin main`). If one of them edits this file, keep this version of Section 9: it lists only what's still pending.
-- [ ] **Rewrite the reflection drafts** for Days 31–49 in my own words. Each is marked 📝 Draft at the top.
-- [ ] **Apply the new migrations locally** before running Days 31–45: `docker compose up -d && pnpm prisma:migrate` in each folder.
+- [ ] **Rewrite the reflection drafts** for Days 31–50 in my own words. Each is marked 📝 Draft at the top.
+- [ ] **Apply the migrations locally** before running a database-backed day: `docker compose up -d && pnpm prisma:migrate` in its folder.
 - [ ] **MongoDB Atlas user (password lost):** reset it in Atlas → Database Access → Edit → Edit Password (no old password needed), or delete the user if that cluster isn't used. Optional: the credential was never committed.
-
-#### 🟡 Remaining Intermediate Days
-
-Start each one with `pnpm new-day <day> <slug> "<Topic>"`.
-
-- [ ] ❌ **Day 34 — Log context:** child loggers carrying user and route, redaction of secrets in log output, per-environment log levels (builds on the shared Winston logger).
-- [ ] ❌ **Day 36 — Soft delete:** a `deletedAt` column, filtering in one place (Prisma client extension), a restore endpoint, and uniqueness that ignores deleted rows (partial index).
-- [ ] ❌ **Day 39 — File upload to cloud storage:** S3-compatible storage (MinIO in compose), pre-signed upload/download URLs, size and type validation.
-- [ ] ❌ **Day 40 — Email notifications:** send email through a queue (BullMQ + the Day 33 Redis), retries with backoff, Mailpit in compose to see the messages.
-- [ ] ❌ **Day 41 — Webhooks:** verify HMAC signatures over the raw body, reject old timestamps (replay protection), process events idempotently.
-- [ ] ❌ **Day 42 — API versioning:** `/v1` and `/v2` side by side, `Deprecation`/`Sunset` headers, one OpenAPI document per version.
-- [ ] ❌ **Day 44 — Test doubles and coverage:** stubs vs mocks vs fakes (Day 37's in-memory repository is a fake), and what coverage does and doesn't prove.
-- [ ] ❌ **Day 48 — Relationships:** one-to-many and many-to-many with Prisma, nested writes, avoiding N+1 queries with `include`/`select`.
-- [ ] ❌ **Day 50 — Transactions:** batch and interactive `$transaction`, isolation levels, optimistic concurrency with a `version` column.
 
 #### 🟢 Before the Advanced Phase (Day 51+)
 
 - [ ] ❌ **HTTPS/TLS:** run the Day 46 stack behind a TLS-terminating reverse proxy (Caddy or Traefik) and set Express `trust proxy`, so rate limits and `Secure` cookies see the real client.
 - [ ] ❌ **Publish images:** push the Day 46 image to GitHub Container Registry from `main` (CI builds and tests it, but doesn't publish it yet).
-- [ ] ❌ **Keep real-database coverage growing:** add each new database-backed day to `pnpm smoke` or give it a Testcontainers suite.
+- [ ] ❌ **Split the smoke test by phase:** it now covers 25 days and takes a few minutes; separate scripts per phase (or per day) would keep failures easy to locate and allow parallel CI jobs.
+- [ ] ❌ **Clean up abandoned uploads (Day 39):** a scheduled job — a repeatable job on the Day 40 queue fits — that removes `PENDING` files and their objects once the upload URL has expired.
+- [ ] ❌ **Dead-letter visibility for the email queue (Day 40):** alert on jobs that exhausted their retries, and add an admin endpoint to inspect and re-queue them.
 
 ---
 
@@ -565,13 +553,13 @@ Start each one with `pnpm new-day <day> <slug> "<Topic>"`.
 | 31 | Swagger / OpenAPI Docs → **Spec-first** | Contract first; validation, docs and a typed client generated from it | ✅ |
 | 32 | Advanced Pagination + Filtering | Offset + keyset pagination, whitelisted sort, filters | ✅ |
 | 33 | Redis Caching | Cache-aside, invalidation, graceful fallback | ✅ |
-| 34 | Winston Logging → **Log context** | Child loggers with user/route context, redaction, per-environment levels | 📋 |
+| 34 | Winston Logging → **Log context** | Child loggers with user/route context, redaction, per-environment levels | ✅ |
 | 35 | DB Seeding + Migrations | Deterministic, idempotent seeds; `db:reset` | ✅ |
-| 36 | Soft Delete Pattern | `deletedAt`, central filtering, restore, partial unique index | 📋 |
+| 36 | Soft Delete Pattern | `deletedAt`, central filtering, restore, partial unique index | ✅ |
 | 37 | Repository + Service Layer | Rules in services, storage behind interfaces, DI | ✅ |
 | 38 | DTOs + Mappers | Explicit per-audience views | ✅ |
-| 39 | File Upload to Cloud | S3-compatible storage (MinIO), pre-signed URLs | 📋 |
-| 40 | Email Notifications | Queue (BullMQ) + retries + Mailpit | 📋 |
+| 39 | File Upload to Cloud | S3-compatible storage (SeaweedFS locally), pre-signed URLs | ✅ |
+| 40 | Email Notifications | Queue (BullMQ) + retries + Mailpit | ✅ |
 
 ### Critical Topics for the Intermediate Phase — Status
 
@@ -589,16 +577,16 @@ Basic Jest/Supertest testing and a working CI existed before these days, so Days
 
 | Day | Topic | Key Goal | Status |
 |---|---|---|---|
-| 41 | Webhook Endpoints | Receive + validate signed (HMAC) webhooks | 📋 |
-| 42 | API Versioning (URI) | `/v1/`, `/v2/` strategy, deprecation headers | 📋 |
+| 41 | Webhook Endpoints | Receive + validate signed (HMAC) webhooks | ✅ |
+| 42 | API Versioning (URI) | `/v1/`, `/v2/` strategy, deprecation headers | ✅ |
 | 43 | Custom Auth Middleware → **Sessions** | httpOnly cookie refresh tokens, CSRF, list/revoke sessions | ✅ |
-| 44 | Unit Testing → **Test Doubles & Coverage** | Mocks vs stubs vs fakes; what coverage proves | 📋 |
+| 44 | Unit Testing → **Test Doubles & Coverage** | Mocks vs stubs vs fakes; what coverage proves | ✅ |
 | 45 | Integration Testing → **Testcontainers** | Real PostgreSQL per test run, real migrations | ✅ |
 | 46 | Docker Containerization | Multi-stage non-root image; compose with migrate job and health checks | ✅ |
 | 47 | GitHub Actions CI → **Pipeline Hardening** | Coverage reports, Docker job, concurrency, least privilege | ✅ |
-| 48 | DB Relationships | One-to-many, many-to-many with Prisma; N+1 | 📋 |
+| 48 | DB Relationships | One-to-many, many-to-many with Prisma; N+1 | ✅ |
 | 49 | Environment Configs | Layered `.env`, Zod schema with production rules, typed config | ✅ |
-| 50 | DB Transactions | Prisma `$transaction`; isolation; optimistic concurrency | 📋 |
+| 50 | DB Transactions | Prisma `$transaction`; isolation; optimistic concurrency | ✅ |
 
 ### Days 51–75 (Advanced) — Key Topics Not to Skip
 
@@ -640,10 +628,10 @@ The original report named the empty `shared/` directory as the biggest risk. Tha
 - `demos/_template` is built and tested in CI, so it can't go stale.
 - `system_design.md` records the decisions a new demo should follow.
 
-Every follow-up from the review is now in the code, with tests and CI enforcing them, and `main` is protected so CI can't be bypassed. Days 31–49 extend that foundation: each new day starts from the template with `pnpm new-day`, ships OpenAPI docs that are contract-tested, and runs against real infrastructure in CI.
+Every follow-up from the review is now in the code, with tests and CI enforcing them, and `main` is protected so CI can't be bypassed. Days 31–50 extend that foundation: each new day starts from the template with `pnpm new-day`, ships OpenAPI docs that are contract-tested, and runs against real infrastructure in CI. Building them against real services also caught bugs that mocks never would have — a checksum signed into every upload URL (Day 39) and serialization conflicts surfacing as 500s under concurrent transfers (Day 50).
 
-At 1 day per day, the remaining 59 put **Day 100 around early December 2026**. The roadmap is sound. Merge the open pull request, finish the nine remaining intermediate days, and the project will fulfil its promise as a portfolio-quality, production-grade learning resource.
+The beginner and intermediate phases are complete. At 1 day per day, the remaining 50 put **Day 100 around late November 2026**. The roadmap is sound. Merge the open pull requests, rewrite the reflection drafts, and start the advanced phase from the template — the project will fulfil its promise as a portfolio-quality, production-grade learning resource.
 
 ---
 
-*Report generated on October 7, 2026, based on 30 demos, 30 reflection files, 223 TypeScript source files and all repository configuration. Verified and updated after the remediation pass, three rounds of follow-up work, and Days 31–49 (October 8, 2026). Every status above was checked against the working tree, git history, a full CI-equivalent run (`pnpm install --frozen-lockfile`, `audit`, `build`, `lint`, `test:coverage`), the real-database smoke test, and GitHub Actions.*
+*Report generated on October 7, 2026, based on 30 demos, 30 reflection files, 223 TypeScript source files and all repository configuration. Verified and updated after the remediation pass, three rounds of follow-up work, and Days 31–50 (October 8, 2026). Every status above was checked against the working tree, git history, a full CI-equivalent run (`pnpm install --frozen-lockfile`, `audit`, `build`, `lint`, `test:coverage`), the real-infrastructure smoke test, and GitHub Actions.*
