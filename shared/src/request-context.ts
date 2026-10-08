@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { RequestHandler } from 'express';
+import { runWithLogContext } from './log-context';
 import { logger } from './logger';
 
 export const REQUEST_ID_HEADER = 'X-Request-Id';
@@ -16,7 +17,8 @@ export const requestId: RequestHandler = (req, res, next) => {
   const incoming = req.get(REQUEST_ID_HEADER);
   req.id = incoming && SAFE_REQUEST_ID.test(incoming) ? incoming : randomUUID();
   res.setHeader(REQUEST_ID_HEADER, req.id);
-  next();
+  // Everything the rest of this request logs carries the id (see log-context.ts)
+  runWithLogContext({ requestId: req.id }, next);
 };
 
 /** Logs one line per request when the response finishes: method, path, status, duration. */
@@ -29,8 +31,11 @@ export const requestLogger: RequestHandler = (req, res, next) => {
     const level = res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : isProbe ? 'debug' : 'info';
     logger.log(level, `${req.method} ${req.originalUrl} ${res.statusCode}`, {
       requestId: req.id,
+      userId: req.user?.id,
       method: req.method,
       path: req.originalUrl,
+      // The route pattern (/api/orders/:id), not the URL, so logs group by endpoint
+      route: req.route ? `${req.baseUrl}${req.route.path}` : undefined,
       status: res.statusCode,
       durationMs: Math.round(durationMs * 10) / 10,
     });

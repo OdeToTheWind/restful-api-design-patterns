@@ -41,7 +41,7 @@ registry.registerPath({
   summary: 'Effective configuration with secrets redacted',
   security: [{ [adminKey.name]: [] }],
   responses: {
-    200: api.success('Redacted config', z.object({}).passthrough()),
+    200: api.success('Redacted config', z.object({}).catchall(z.unknown())),
     401: api.error('Invalid admin key'),
     404: api.error('Admin API disabled'),
     429: api.error('Rate limited'),

@@ -1,0 +1,39 @@
+generator client {
+  provider = "prisma-client-js"
+  // Per-demo output: demos share one @prisma/client install in the pnpm workspace,
+  // so the default location would be overwritten by whichever demo generated last.
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FAILED
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  amountCents Int
+  status      OrderStatus @default(PENDING)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@map("orders")
+}
+
+// Every webhook event we have processed. The unique eventId is what makes processing
+// idempotent: providers deliver "at least once", so the same event can arrive twice.
+model WebhookEvent {
+  id         String   @id @default(cuid())
+  eventId    String   @unique
+  type       String
+  payload    Json
+  receivedAt DateTime @default(now())
+
+  @@map("webhook_events")
+}

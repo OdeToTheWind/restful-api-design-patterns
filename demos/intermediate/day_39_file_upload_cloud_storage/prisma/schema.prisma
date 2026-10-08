@@ -1,0 +1,31 @@
+generator client {
+  provider = "prisma-client-js"
+  // Per-demo output: demos share one @prisma/client install in the pnpm workspace,
+  // so the default location would be overwritten by whichever demo generated last.
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum FileStatus {
+  PENDING // upload URL issued, object not verified yet
+  READY // object verified in storage
+}
+
+// Metadata lives in the database; the bytes live in object storage under `key`
+model File {
+  id          String     @id @default(cuid())
+  key         String     @unique
+  filename    String
+  contentType String
+  sizeBytes   Int
+  status      FileStatus @default(PENDING)
+  createdAt   DateTime   @default(now())
+  uploadedAt  DateTime?
+
+  @@index([status])
+  @@map("files")
+}

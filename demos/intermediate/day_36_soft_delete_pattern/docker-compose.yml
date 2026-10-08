@@ -1,0 +1,18 @@
+# Credentials come from this demo's .env (docker compose reads it automatically).
+# Keep POSTGRES_* in sync with DATABASE_URL — see .env.example.
+services:
+  postgres:
+    image: postgres:16
+    container_name: postgres-day36
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
+    ports:
+      - '127.0.0.1:5432:5432' # localhost only — not reachable from the LAN
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
