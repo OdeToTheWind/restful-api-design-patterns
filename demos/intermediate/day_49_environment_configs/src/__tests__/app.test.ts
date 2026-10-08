@@ -40,6 +40,7 @@ describe('/api/admin/config', () => {
   it('returns the redacted config for the right key', async () => {
     const res = await request(createApp(configWith())).get('/api/admin/config').set('X-Admin-Key', KEY);
     expect(res.status).toBe(200);
+    expectToMatchSpec(res, 'get', '/api/admin/config');
     expect(res.body.data.adminApiKey).toBe('[set]');
     expect(res.body.data.loadedFiles).toEqual(['.env.test']);
     expect(JSON.stringify(res.body)).not.toContain(KEY);
