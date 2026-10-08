@@ -1,9 +1,10 @@
 import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import { errorHandler, healthRouter, notFoundHandler, requestId, requestLogger } from '@restful/shared';
+import { docsRouter, errorHandler, healthRouter, notFoundHandler, requestId, requestLogger } from '@restful/shared';
 import apiRoutes from './routes';
 import { config } from './config';
+import { openApiDocument } from './docs/openapi';
 
 const app: Application = express();
 
@@ -19,6 +20,9 @@ app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
 // Liveness (/health) and readiness (/ready) probes for Docker, load balancers, uptime checks
 app.use(healthRouter());
+
+// API docs: /api/docs (Swagger UI) and /api/docs/openapi.json
+app.use(docsRouter(openApiDocument));
 
 app.use('/api', apiRoutes);
 

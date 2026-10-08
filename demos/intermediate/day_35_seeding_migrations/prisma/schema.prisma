@@ -1,0 +1,37 @@
+generator client {
+  provider = "prisma-client-js"
+  // Per-demo output: demos share one @prisma/client install in the pnpm workspace,
+  // so the default location would be overwritten by whichever demo generated last.
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Author {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  posts     Post[]
+  createdAt DateTime @default(now())
+
+  @@map("authors")
+}
+
+model Post {
+  id          String    @id @default(cuid())
+  // Natural key: the seed upserts on it, so re-running the seed never duplicates posts
+  slug        String    @unique
+  title       String
+  body        String
+  published   Boolean   @default(false)
+  publishedAt DateTime?
+  authorId    String
+  author      Author    @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@index([published, publishedAt(sort: Desc)])
+  @@map("posts")
+}

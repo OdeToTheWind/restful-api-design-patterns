@@ -6,9 +6,10 @@ node_modules/
 dist/
 build/
 
-# Environment variables
+# Environment variables (.env.development / .env.test / .env.production may be committed: no secrets)
 .env
 .env.local
+.env.*.local
 
 # Logs
 *.log

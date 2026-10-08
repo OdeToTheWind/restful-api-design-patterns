@@ -4,6 +4,9 @@ dist
 generated
 coverage
 pnpm-lock.yaml
+# Generator output is checked byte-for-byte against the generator (Day 31 drift test)
+demos/**/openapi.json
+demos/**/src/client/schema.d.ts
 
 # Lesson snapshots are kept exactly as written (same scope as ESLint)
 demos/beginner

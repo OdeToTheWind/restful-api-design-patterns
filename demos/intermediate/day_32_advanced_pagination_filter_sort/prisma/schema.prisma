@@ -1,0 +1,27 @@
+generator client {
+  provider = "prisma-client-js"
+  // Per-demo output: demos share one @prisma/client install in the pnpm workspace,
+  // so the default location would be overwritten by whichever demo generated last.
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Product {
+  id         String   @id @default(cuid())
+  name       String
+  category   String
+  // Money as integer cents: no floating-point rounding errors
+  priceCents Int
+  stock      Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  // One index per common filter/sort, plus the composite key used by cursor pagination
+  @@index([category])
+  @@index([priceCents])
+  @@index([createdAt(sort: Desc), id(sort: Desc)])
+  @@map("products")
+}

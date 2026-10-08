@@ -1,9 +1,10 @@
 import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import { errorHandler, healthRouter, notFoundHandler, requestId, requestLogger } from '@restful/shared';
+import { docsRouter, errorHandler, healthRouter, notFoundHandler, requestId, requestLogger } from '@restful/shared';
 import apiRoutes from './routes';
 import { config } from './config';
+import { openApiDocument } from './docs/openapi';
 import mongoose from 'mongoose';
 
 const app: Application = express();
@@ -27,6 +28,9 @@ app.use(
     },
   }),
 );
+
+// API docs: /api/docs (Swagger UI) and /api/docs/openapi.json
+app.use(docsRouter(openApiDocument));
 
 app.use('/api', apiRoutes);
 

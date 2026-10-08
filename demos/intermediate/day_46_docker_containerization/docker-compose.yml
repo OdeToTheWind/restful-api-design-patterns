@@ -1,0 +1,75 @@
+# The whole stack in containers: `docker compose up --build --wait`
+#   postgres  → healthy (pg_isready)
+#   migrate   → one-off job: applies migrations, then exits 0
+#   api       → starts only after migrations succeeded; healthy when /ready passes
+# Credentials come from this demo's .env (see .env.example).
+name: day46
+
+x-app-image: &app-image
+  image: restful-api/day46:local
+  build:
+    context: ../../..
+    dockerfile: docker/demo.Dockerfile
+    args:
+      PACKAGE: day_46_docker_containerization
+
+x-database-url: &database-url
+  DATABASE_URL: postgresql://${POSTGRES_USER:?set in .env}:${POSTGRES_PASSWORD:?set in .env}@postgres:5432/${POSTGRES_DB:?set in .env}?schema=public
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    ports:
+      - '127.0.0.1:5432:5432' # for running the API outside Docker (pnpm dev); localhost only
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  migrate:
+    <<: *app-image
+    command: ['node_modules/.bin/prisma', 'migrate', 'deploy']
+    environment:
+      <<: *database-url
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: 'no'
+
+  api:
+    <<: *app-image
+    environment:
+      <<: *database-url
+      PORT: 3046
+      CORS_ORIGIN: ${CORS_ORIGIN:-}
+    ports:
+      - '127.0.0.1:3046:3046'
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      # Readiness, not just liveness: healthy only when the database answers too
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3046/ready').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    # Time for startServer to drain in-flight requests after SIGTERM
+    stop_grace_period: 15s
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

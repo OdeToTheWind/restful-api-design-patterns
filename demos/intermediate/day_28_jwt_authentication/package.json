@@ -12,7 +12,7 @@
     "prisma:migrate": "prisma migrate dev",
     "postinstall": "prisma generate",
     "test": "jest",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage --coverageReporters=text --coverageReporters=lcov --coverageReporters=json-summary"
   },
   "license": "MIT",
   "dependencies": {

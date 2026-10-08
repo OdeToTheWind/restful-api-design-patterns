@@ -15,7 +15,9 @@
     "test:coverage": "pnpm -r --if-present run test:coverage",
     "smoke": "bash scripts/smoke-test.sh",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "new-day": "node scripts/new-day.mjs",
+    "test:integration": "pnpm -r --if-present run test:integration"
   },
   "keywords": [
     "rest-api",
