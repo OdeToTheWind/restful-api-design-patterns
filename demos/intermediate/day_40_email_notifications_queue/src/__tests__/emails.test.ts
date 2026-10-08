@@ -23,17 +23,16 @@ const fakeQueue = () => {
     }),
     getJob: jest.fn(async (id: string) => {
       const job = jobs.get(id);
-      return (
-        job && {
-          ...job,
-          failedReason: job.state === 'failed' ? 'SMTP 550 permanent failure' : undefined,
-          finishedOn: job.state === 'failed' ? Date.now() : undefined,
-          getState: async () => job.state,
-          retry: jest.fn(async () => {
-            job.state = 'waiting';
-          }),
-        }
-      );
+      if (!job) return undefined;
+      return {
+        ...job,
+        failedReason: job.state === 'failed' ? 'SMTP 550 permanent failure' : undefined,
+        finishedOn: job.state === 'failed' ? Date.now() : undefined,
+        getState: async () => job.state,
+        retry: jest.fn(async () => {
+          job.state = 'waiting';
+        }),
+      };
     }),
     getFailed: jest.fn(async () => {
       return [...jobs.values()]
@@ -52,7 +51,7 @@ const fakeQueue = () => {
   return { queue: queue as unknown as EmailQueue & typeof queue, jobs };
 };
 
-const welcome = { type: 'welcome', to: 'ADA@example.com', data: { name: 'Ada' } };
+const welcome: EmailRequest = { type: 'welcome', to: 'ADA@example.com', data: { name: 'Ada' } };
 
 describe('POST /api/emails', () => {
   it('queues the email and answers 202 with a status URL — nothing is sent in the request', async () => {
