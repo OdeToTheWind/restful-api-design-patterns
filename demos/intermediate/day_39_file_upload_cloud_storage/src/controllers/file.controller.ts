@@ -77,4 +77,28 @@ export class FileController {
     await prisma.file.delete({ where: { id: file.id } });
     ApiResponse.success(res, null, 'File deleted');
   }
+
+  /**
+   * Periodic or on-demand cleanup: removes PENDING uploads whose pre-signed URL has expired,
+   * deleting any orphaned object in storage and removing the DB record.
+   */
+  static async cleanupAbandoned(_req: Request, res: Response) {
+    const cutoff = new Date(Date.now() - config.uploadUrlTtlSeconds * 1000);
+    const abandoned = await prisma.file.findMany({
+      where: {
+        status: 'PENDING',
+        createdAt: { lt: cutoff },
+      },
+    });
+
+    const cleanedIds: string[] = [];
+    for (const file of abandoned) {
+      await deleteObject(file.key);
+      await prisma.file.delete({ where: { id: file.id } });
+      cleanedIds.push(file.id);
+    }
+
+    logger.info('Cleaned up abandoned file uploads', { count: cleanedIds.length, cleanedIds });
+    ApiResponse.success(res, { cleanedCount: cleanedIds.length, cleanedIds }, 'Abandoned uploads cleaned up');
+  }
 }

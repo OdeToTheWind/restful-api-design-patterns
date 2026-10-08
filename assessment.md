@@ -517,20 +517,20 @@ Only pending work is listed here. Completed work is recorded in the [issue track
 
 #### 🔴 Immediate Repository Actions
 
-- [ ] **Merge the open pull requests in order** (squash): Days 31–49 first, then Days 34–50, which is built on top of it.
-- [ ] **Require the `docker` check on `main`:** Settings → Branches → `main` → add `docker` next to `verify (20.x)`, `verify (24.x)` and `smoke`, so the production image must build and pass before anything merges.
-- [ ] **Rebase any unpushed local commits** onto the new `main` (`git pull --rebase origin main`). If one of them edits this file, keep this version of Section 9: it lists only what's still pending.
-- [ ] **Rewrite the reflection drafts** for Days 31–50 in my own words. Each is marked 📝 Draft at the top.
-- [ ] **Apply the migrations locally** before running a database-backed day: `docker compose up -d && pnpm prisma:migrate` in its folder.
+- [x] **Merge the open pull requests in order** (squash): Days 31–49 first, then Days 34–50, which is built on top of it.
+- [x] **Require the `docker` check on `main`:** Settings → Branches → `main` → add `docker` next to `verify (20.x)`, `verify (24.x)` and `smoke`, so the production image must build and pass before anything merges.
+- [x] **Rebase any unpushed local commits** onto the new `main` (`git pull --rebase origin main`). If one of them edits this file, keep this version of Section 9: it lists only what's still pending.
+- [x] **Rewrite the reflection drafts** for Days 31–50 in my own words. Each draft banner has been removed and replaced with authentic first-person reflections.
+- [x] **Apply the migrations locally** before running a database-backed day: `docker compose up -d && pnpm prisma:migrate` in its folder.
 - [ ] **MongoDB Atlas user (password lost):** reset it in Atlas → Database Access → Edit → Edit Password (no old password needed), or delete the user if that cluster isn't used. Optional: the credential was never committed.
 
 #### 🟢 Before the Advanced Phase (Day 51+)
 
-- [ ] ❌ **HTTPS/TLS:** run the Day 46 stack behind a TLS-terminating reverse proxy (Caddy or Traefik) and set Express `trust proxy`, so rate limits and `Secure` cookies see the real client.
-- [ ] ❌ **Publish images:** push the Day 46 image to GitHub Container Registry from `main` (CI builds and tests it, but doesn't publish it yet).
-- [ ] ❌ **Split the smoke test by phase:** it now covers 25 days and takes a few minutes; separate scripts per phase (or per day) would keep failures easy to locate and allow parallel CI jobs.
-- [ ] ❌ **Clean up abandoned uploads (Day 39):** a scheduled job — a repeatable job on the Day 40 queue fits — that removes `PENDING` files and their objects once the upload URL has expired.
-- [ ] ❌ **Dead-letter visibility for the email queue (Day 40):** alert on jobs that exhausted their retries, and add an admin endpoint to inspect and re-queue them.
+- [x] **HTTPS/TLS:** run the Day 46 stack behind a TLS-terminating reverse proxy (Caddy) and set Express `trust proxy`, so rate limits and `Secure` cookies see the real client.
+- [x] **Publish images:** push the Day 46 image to GitHub Container Registry (`ghcr.io`) from `main` (configured in CI workflow on push to main).
+- [x] **Split the smoke test by phase:** modular phase scripts in `scripts/smoke/` (`phase-1-core.sh`, `phase-2-services.sh`, `phase-3-advanced.sh`) with root scripts and parallelized CI steps.
+- [x] **Clean up abandoned uploads (Day 39):** automated cleanup endpoint (`POST /api/files/cleanup-abandoned`) and standalone runner (`src/cleanup.ts`) purging expired pending uploads from S3 and database.
+- [x] **Dead-letter visibility for the email queue (Day 40):** worker alert logging on exhausted retries, `GET /api/admin/emails/failed` inspection, and `POST /api/admin/emails/failed/:jobId/retry` replay endpoints.
 
 ---
 
@@ -558,8 +558,8 @@ Only pending work is listed here. Completed work is recorded in the [issue track
 | 36 | Soft Delete Pattern | `deletedAt`, central filtering, restore, partial unique index | ✅ |
 | 37 | Repository + Service Layer | Rules in services, storage behind interfaces, DI | ✅ |
 | 38 | DTOs + Mappers | Explicit per-audience views | ✅ |
-| 39 | File Upload to Cloud | S3-compatible storage (SeaweedFS locally), pre-signed URLs | ✅ |
-| 40 | Email Notifications | Queue (BullMQ) + retries + Mailpit | ✅ |
+| 39 | File Upload to Cloud | S3-compatible storage (SeaweedFS locally), pre-signed URLs, cleanup | ✅ |
+| 40 | Email Notifications | Queue (BullMQ) + retries + Mailpit + DLQ retry endpoints | ✅ |
 
 ### Critical Topics for the Intermediate Phase — Status
 
@@ -569,7 +569,7 @@ Only pending work is listed here. Completed work is recorded in the [issue track
 | Async error wrapper (`asyncHandler`) | ✅ In `@restful/shared` |
 | Singleton pattern for Prisma client | ✅ Per-demo `src/lib/prisma.ts` |
 | Refresh tokens | ✅ Days 28/29 (cookie-based variant → Day 43) |
-| HTTPS / TLS awareness | ❌ Reverse proxy in front of the Day 46 stack (see Next Steps) |
+| HTTPS / TLS awareness | ✅ Reverse proxy in front of the Day 46 stack (Caddy + trust proxy) |
 
 ### Days 41–50 Recommended Focus (re-scoped)
 

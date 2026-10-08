@@ -13,6 +13,11 @@ const env = loadEnv(
     DATABASE_URL: z.string().url(),
     // Allowed browser origins, comma-separated. Empty = no cross-origin access.
     CORS_ORIGIN: envFields.csv,
+    TRUST_PROXY: z
+      .string()
+      .optional()
+      .default('true')
+      .transform((v) => v === 'true' || v === '1'),
   }),
 );
 
@@ -21,4 +26,5 @@ export const config = {
   nodeEnv: env.NODE_ENV,
   databaseUrl: env.DATABASE_URL,
   corsOrigins: env.CORS_ORIGIN,
+  trustProxy: env.TRUST_PROXY,
 };

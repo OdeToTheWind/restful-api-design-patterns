@@ -9,6 +9,11 @@ import { openApiDocument } from './docs/openapi';
 
 const app: Application = express();
 
+// Trust reverse proxy (Caddy/Traefik) so req.protocol, req.secure, and req.ip reflect real client
+if (config.trustProxy) {
+  app.set('trust proxy', 1);
+}
+
 // Request id + one log line per request — first, so every later log can reference it
 app.use(requestId);
 app.use(requestLogger);
@@ -27,11 +32,26 @@ app.use(docsRouter(openApiDocument));
 
 app.use('/api', apiRoutes);
 
+// Reverse proxy verification endpoint
+app.get('/api/proxy-info', (req: Request, res: Response) => {
+  res.json({
+    protocol: req.protocol,
+    secure: req.secure,
+    ip: req.ip,
+    ips: req.ips,
+    host: req.get('host'),
+    forwardedProto: req.get('x-forwarded-proto') || null,
+  });
+});
+
 app.get('/', (req: Request, res: Response) => {
   res.json({
     message: 'Welcome to Day 46 - Docker Containerization',
     documentation: '/api/docs',
     runInDocker: 'pnpm docker:up',
+    protocol: req.protocol,
+    secure: req.secure,
+    ip: req.ip,
     day: 46,
   });
 });

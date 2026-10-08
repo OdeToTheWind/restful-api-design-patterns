@@ -96,8 +96,14 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Real-database smoke test
-        run: pnpm smoke
+      - name: 'Smoke test — Phase 1: Core (Days 26–33)'
+        run: pnpm smoke:phase1
+
+      - name: 'Smoke test — Phase 2: Services (Days 34–43)'
+        run: pnpm smoke:phase2
+
+      - name: 'Smoke test — Phase 3: Advanced (Days 44–50)'
+        run: pnpm smoke:phase3
 
       - name: Integration tests (Testcontainers)
         run: pnpm test:integration
@@ -107,6 +113,9 @@ jobs:
     needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
     defaults:
       run:
         working-directory: demos/intermediate/day_46_docker_containerization
@@ -148,6 +157,24 @@ jobs:
         run: |
           docker compose stop api
           test "$(docker inspect --format '{{.State.ExitCode}}' day46-api-1)" = 0
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish image to GitHub Container Registry
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE="ghcr.io/$REPO_LOWER/day46"
+          docker tag restful-api/day46:local "$IMAGE:latest"
+          docker tag restful-api/day46:local "$IMAGE:${{ github.sha }}"
+          docker push "$IMAGE:latest"
+          docker push "$IMAGE:${{ github.sha }}"
 
       - name: Logs on failure
         if: failure()

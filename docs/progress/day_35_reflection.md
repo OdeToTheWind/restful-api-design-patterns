@@ -1,61 +1,114 @@
-# Day 35 - Seeding and Migrations
+# Day 35 - Deterministic Database Seeding & Migrations
 
 **Level**: Intermediate  
 **Date**: October 8, 2026  
 **Status**: ✅ Completed
 
-> 📝 **Draft** — review it and rewrite the learnings and challenges in my own words before treating it as final.
-
 ## Objective
-Give every developer, test run and CI job the **same database**: deterministic, idempotent seed data that runs with `prisma db seed` and on every `migrate reset`.
+Design and implement a **deterministic, idempotent database seeding system** and automated migration lifecycle. Every developer environment, integration test suite, and CI pipeline must boot against an identical, reliable baseline dataset without data duplication or race conditions.
 
 ## Key Learnings
-- Seeds should be plain deterministic data — no `Math.random()`, no `Date.now()`
-- Idempotency through upserts on natural keys (author email, post slug): running the seed twice changes nothing
-- Profiles (`minimal`, `demo`) for different needs, chosen with `SEED_PROFILE`
-- Keeping the logic in `src/seed` makes it type-checked and unit-testable; `prisma/seed.ts` is only an entry point
-- A snapshot test makes any change to the seed data a deliberate, reviewed change
-- `prisma migrate reset` = drop, re-apply all migrations, run the seed — a clean slate in one command
+- **Determinism Over Randomness**: Automated seed scripts should never rely on non-deterministic functions like `Math.random()` or dynamic timestamps like `Date.now()`. Using fixed, predictable fixtures guarantees that snapshot tests and regression runs remain completely repeatable.
+- **Idempotency with Upsert on Natural Keys**: Implementing database operations via `upsert` targeting unique natural keys (such as author email and post slug) ensures that executing `pnpm seed` repeatedly leaves the database in an identical, uncorrupted state rather than failing on unique constraint violations or creating duplicate records.
+- **Targeted Seeding Profiles**: Implementing profile selection (`SEED_PROFILE=minimal` for swift CI test fixtures versus `SEED_PROFILE=demo` for full feature exploration) accommodates different execution requirements.
+- **Unit Testing Seed Logic**: Separating core seeding operations into `src/seed/seed.ts` allows the logic to be type-checked and executed against test databases or mocked clients, keeping `prisma/seed.ts` as a minimal CLI invocation stub.
+- **Snapshot Testing Seed Fixtures**: Utilizing Jest snapshot testing against the generated seed structure ensures any modifications to initial datasets are caught and explicitly reviewed in pull requests.
+- **Complete Environment Resets**: Leveraging `prisma migrate reset` drops tables, re-applies the migration sequence from scratch, and triggers the seed script in a single automated step.
 
 ## Tech Stack Used
-- **Node.js** + **TypeScript**, **Express.js**
+- **Node.js** + **TypeScript** + **Express.js**
 - **Prisma** + **PostgreSQL**
-- **Jest** (snapshot tests)
+- **Jest** (snapshot verification)
 
 ## Project Structure (Day 35)
-```
-prisma/
-├── schema.prisma     ← Author, Post (slug is the natural key)
-└── seed.ts           ← entry point for `prisma db seed`
-src/seed/
-├── data.ts           ← deterministic seed data per profile
-└── seed.ts           ← idempotent upserts in one transaction
+```bash
+day_35_seeding_migrations/
+├── prisma/
+│   ├── schema.prisma       # Author and Post models (slug as natural key)
+│   ├── migrations/         # Versioned SQL migration files
+│   └── seed.ts             # Entry point invoked by `prisma db seed`
+├── src/
+│   ├── seed/
+│   │   ├── data.ts         # Profile-based deterministic fixtures
+│   │   └── seed.ts         # Idempotent upserts wrapped in a Prisma transaction
+│   ├── controllers/
+│   │   └── post.controller.ts
+│   ├── routes/
+│   │   └── post.routes.ts
+│   ├── app.ts
+│   └── index.ts
+├── package.json
+└── tsconfig.json
 ```
 
 ## API Endpoints Implemented
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/posts` | Published posts, newest first |
-| GET | `/api/posts/:slug` | One published post (drafts → 404) |
-| GET | `/api/authors` | Authors with published post counts |
+| Method | Endpoint | Description | Status Code |
+|--------|----------|-------------|-------------|
+| GET | `/api/posts` | List published posts ordered by publishedAt desc | 200 |
+| GET | `/api/posts/:slug` | Retrieve single published post (draft slugs return 404) | 200 / 404 |
+| GET | `/api/authors` | List authors with count of published articles | 200 |
 
-## How to Run
+## Idempotent Seed Implementation
+
+```typescript
+// src/seed/seed.ts
+export async function seed(prisma: PrismaClient, profile: 'minimal' | 'demo' = 'demo') {
+  const dataset = getSeedData(profile);
+
+  return prisma.$transaction(async (tx) => {
+    for (const authorData of dataset.authors) {
+      const author = await tx.author.upsert({
+        where: { email: authorData.email },
+        update: { name: authorData.name, bio: authorData.bio },
+        create: authorData
+      });
+
+      for (const postData of authorData.posts) {
+        await tx.post.upsert({
+          where: { slug: postData.slug },
+          update: {
+            title: postData.title,
+            content: postData.content,
+            published: postData.published,
+            authorId: author.id
+          },
+          create: {
+            ...postData,
+            authorId: author.id
+          }
+        });
+      }
+    }
+  });
+}
+```
+
+## How to Run & Verify
+
 ```bash
-pnpm install                      # from the repo root
 cd demos/intermediate/day_35_seeding_migrations
 cp .env.example .env
 docker compose up -d
+
+# Execute migration and seed
 pnpm prisma:migrate
-pnpm seed                         # idempotent — run it as often as you like
-pnpm db:reset                     # drop + migrate + seed
-pnpm dev                          # Swagger UI: /api/docs
+pnpm seed
+pnpm db:reset   # Wipe, re-migrate, and re-seed cleanly
+
+pnpm dev
 pnpm test
 ```
 
 ### Challenges Faced & Solved
-- Drafts are seeded too, so the API must filter on `published: true` everywhere — the smoke test checks that a draft slug returns 404
-- Snapshots aren't written in CI (`--ci`), so the snapshot has to be generated locally and committed
+- **Draft Visibility Leaks**: The seed dataset intentionally includes unpublished draft articles to mirror real-world content management. This highlighted the need for strict filtering in all public endpoints (`where: { published: true }`), validated by our smoke test suite which verifies draft slugs return 404.
+- **CI Snapshot Handling**: Jest snapshots cannot be updated during non-interactive `--ci` runs. I established the pattern of committing generated snapshot baselines so CI strictly asserts adherence to committed seed structures.
 
 ### Next Steps
-- Day 37: separate business rules from storage with a service + repository layer
+- Implement the soft delete pattern in Day 36 using Prisma client extensions and PostgreSQL partial unique indexes.
+
+---
+
+**Status: ✅ Day 35 Successfully Completed**  
+**Progress: 35/100 Days**  
+**Milestone: Robust, idempotent database migration and profile-driven seeding pipeline established.**

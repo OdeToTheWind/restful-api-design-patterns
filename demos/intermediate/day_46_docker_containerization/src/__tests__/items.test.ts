@@ -72,6 +72,23 @@ describe('app-level middleware', () => {
     expect(res.status).toBe(404);
     expect(res.body.success).toBe(false);
   });
+
+  it('respects X-Forwarded-Proto and X-Forwarded-For headers when trust proxy is active', async () => {
+    const res = await request(app)
+      .get('/api/proxy-info')
+      .set('X-Forwarded-Proto', 'https')
+      .set('X-Forwarded-For', '203.0.113.195');
+
+    expect(res.status).toBe(200);
+    expect(res.body.protocol).toBe('https');
+    expect(res.body.secure).toBe(true);
+    expect(res.body.ip).toBe('203.0.113.195');
+    expect(res.body.forwardedProto).toBe('https');
+
+    const directRes = await request(app).get('/api/proxy-info');
+    expect(directRes.status).toBe(200);
+    expect(directRes.body.forwardedProto).toBeNull();
+  });
 });
 
 describe('route params and health probes', () => {

@@ -18,8 +18,15 @@ const worker = new Worker(EMAIL_QUEUE, (job) => runWithLogContext({ jobId: job.i
 });
 
 worker.on('failed', (job, error) => {
-  if (job && job.attemptsMade >= (job.opts.attempts ?? 1))
-    logger.error('email gave up', { jobId: job.id, error: error.message });
+  if (job && job.attemptsMade >= (job.opts.attempts ?? 1)) {
+    logger.error('DEAD LETTER: email job failed permanently after exhausting all retries', {
+      jobId: job.id,
+      type: job.data?.type,
+      to: job.data?.to,
+      attemptsMade: job.attemptsMade,
+      error: error.message,
+    });
+  }
 });
 logger.info(`Email worker listening on queue "${EMAIL_QUEUE}"`);
 

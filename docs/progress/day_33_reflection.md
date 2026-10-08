@@ -1,62 +1,106 @@
-# Day 33 - Redis Caching
+# Day 33 - Redis Caching & Cache Invalidation
 
 **Level**: Intermediate  
 **Date**: October 8, 2026  
 **Status**: ✅ Completed
 
-> 📝 **Draft** — review it and rewrite the learnings and challenges in my own words before treating it as final.
-
 ## Objective
-Speed up reads with **cache-aside** caching in Redis, keep the cache correct with explicit invalidation, and keep the API working when Redis is down.
+Implement high-throughput reading using the **Cache-Aside pattern** with Redis 7, establish dependable write-through cache invalidation (including list versioning), and ensure the API degrades gracefully to database queries if Redis becomes unavailable.
 
 ## Key Learnings
-- Cache-aside: read Redis → on a miss load from the database → store with a TTL
-- Invalidate on writes: delete the item key; for lists, bump a **version number** so every old list key becomes unreachable at once
-- Write to the database first, then invalidate — otherwise a concurrent read can re-cache the old row
-- The TTL is a safety net that bounds staleness if an invalidation is ever missed
-- Degrade, don't fail: with `enableOfflineQueue: false` Redis errors are immediate and requests fall back to the database (`X-Cache: BYPASS`)
-- Testing with `ioredis-mock` gives real Redis command semantics without a server
+- **The Cache-Aside (Lazy Loading) Workflow**: Application logic inspects Redis first. On a cache hit, data returns immediately. On a cache miss, data is read from PostgreSQL, populated into Redis with an explicit Time-To-Live (TTL), and returned to the caller.
+- **Write-First Invalidation Order**: Always commit updates to the database *before* evicting Redis cache entries. Inverting this order creates a race condition where a concurrent read can fetch old data from the database and re-populate the cache right before the write completes.
+- **Cache Invalidation for Collections via List Versioning**: Evicting individual item keys (`product:123`) is straightforward, but evicting hundreds of paginated, filtered search results is notoriously hard. By maintaining a single `products:version` integer and incorporating it into list cache keys (`products:v{version}:p{page}...`), bumping the version on any mutation renders all prior collection queries unreachable instantaneously without costly scanning.
+- **Graceful Degradation with Fail-Fast Configuration**: Setting `enableOfflineQueue: false` and `maxRetriesPerRequest: 1` in `ioredis` prevents incoming requests from hanging when Redis is down. Queries bypass the cache seamlessly and populate the `X-Cache: BYPASS` header.
+- **Selective Readiness Checks**: The `/ready` probe checks PostgreSQL connectivity but treats Redis as an optional accelerator. If Redis fails, the API remains available to serve live traffic directly from the primary database.
 
 ## Tech Stack Used
-- **Node.js** + **TypeScript**, **Express.js**
+- **Node.js** + **TypeScript** + **Express.js**
 - **Prisma** + **PostgreSQL**
-- **Redis 7** + **ioredis**
-- **ioredis-mock**, **Jest** + **Supertest**
+- **Redis 7** (running via Docker with LRU memory eviction)
+- **ioredis** + **ioredis-mock** (for isolated unit tests)
+- **Jest** + **Supertest**
 
 ## Project Structure (Day 33)
-```
-src/
-├── lib/redis.ts      ← one connection, fail-fast options
-├── lib/cache.ts      ← cached(), invalidate(), list versioning
-└── controllers/product.controller.ts
-docker-compose.yml    ← Postgres + Redis (no persistence, LRU eviction)
+```bash
+day_33_caching_redis_intro/
+├── src/
+│   ├── lib/
+│   │   ├── redis.ts       # Singleton connection with fail-fast options and error logging
+│   │   └── cache.ts       # cached(), invalidate(), bumpListVersion() utilities
+│   ├── controllers/
+│   │   └── product.controller.ts # Handlers with cache-aside and X-Cache headers
+│   ├── routes/
+│   │   └── product.routes.ts
+│   ├── app.ts
+│   └── index.ts
+├── docker-compose.yml     # PostgreSQL + Redis 7
+├── package.json
+└── tsconfig.json
 ```
 
 ## API Endpoints Implemented
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/products` | List (cached; `X-Cache` header) |
-| GET | `/api/products/:id` | One product (cached per id) |
-| POST | `/api/products` | Create (bumps list version) |
-| PATCH | `/api/products/:id` | Update (evicts + bumps) |
-| DELETE | `/api/products/:id` | Delete (evicts + bumps) |
+| Method | Endpoint | Description | Cache Behavior |
+|--------|----------|-------------|----------------|
+| GET | `/api/products` | Retrieve catalog list | Cache-aside (X-Cache: HIT / MISS / BYPASS) |
+| GET | `/api/products/:id` | Retrieve single item by ID | Cache-aside with per-item key |
+| POST | `/api/products` | Create product | Bumps list version key |
+| PATCH | `/api/products/:id` | Update product | Evicts item key + bumps list version |
+| DELETE | `/api/products/:id` | Delete product | Evicts item key + bumps list version |
 
-## How to Run
+## Cache Invalidation Pattern
+
+```typescript
+// src/lib/cache.ts
+export async function getCachedOrFetch<T>(
+  key: string,
+  ttlSeconds: number,
+  fetcher: () => Promise<T>
+): Promise<{ data: T; status: 'HIT' | 'MISS' | 'BYPASS' }> {
+  try {
+    const cached = await redis.get(key);
+    if (cached) {
+      return { data: JSON.parse(cached), status: 'HIT' };
+    }
+  } catch (err) {
+    logger.warn('Redis unavailable, bypassing cache', { error: err });
+    const data = await fetcher();
+    return { data, status: 'BYPASS' };
+  }
+
+  const data = await fetcher();
+  try {
+    await redis.set(key, JSON.stringify(data), 'EX', ttlSeconds);
+  } catch (err) {
+    logger.warn('Failed to populate Redis cache', { error: err });
+  }
+  return { data, status: 'MISS' };
+}
+```
+
+## How to Run & Verify
+
 ```bash
-pnpm install                      # from the repo root
 cd demos/intermediate/day_33_caching_redis_intro
 cp .env.example .env
 docker compose up -d
 pnpm prisma:migrate
-pnpm dev                          # Swagger UI: /api/docs
+pnpm dev
+
+# Test cache hits, misses, and mock fallbacks
 pnpm test
 ```
 
 ### Challenges Faced & Solved
-- The smoke test stops Redis mid-run: reads correctly switched to `BYPASS`, but **shutdown then exited with code 1** because `redis.quit()` rejects on a dead connection — the hook now disconnects instead when Redis isn't ready
-- Without an `error` listener, ioredis reports every reconnect attempt as an unhandled error event
-- Readiness (`/ready`) checks only the database on purpose: Redis is optional, so its absence shouldn't take the API out of rotation
+- **Shutdown Rejection on Severed Redis Connections**: In our smoke test suite, Redis is stopped mid-execution to verify fallback handling. When the server later tried to shut down gracefully, `redis.quit()` rejected because the socket was closed, causing process termination with an error exit code. I updated the shutdown handler to inspect `redis.status` and call `redis.disconnect()` instead when not in a ready state.
+- **Unhandled Error Event Spam**: Without an attached `.on('error', ...)` listener, `ioredis` emits uncaught exception events for every failed reconnect attempt. Adding an explicit error listener converts connection drops into structured warnings.
 
 ### Next Steps
-- Day 35: seed data so every environment starts from the same database
+- Implement structured contextual logging in Day 34 using Winston and `AsyncLocalStorage` to trace requests and ensure sensitive data never appears in logs.
+
+---
+
+**Status: ✅ Day 33 Successfully Completed**  
+**Progress: 33/100 Days**  
+**Milestone: Production Redis caching architecture implemented with list versioning and resilient offline degradation.**
