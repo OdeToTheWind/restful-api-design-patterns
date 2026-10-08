@@ -1,0 +1,69 @@
+generator client {
+  provider = "prisma-client-js"
+  // Per-demo output: demos share one @prisma/client install in the pnpm workspace,
+  // so the default location would be overwritten by whichever demo generated last.
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Course {
+  id          String       @id @default(cuid())
+  title       String
+  createdAt   DateTime     @default(now())
+  // one-to-many
+  lessons     Lesson[]
+  // many-to-many WITH data on the link → explicit join model
+  enrollments Enrollment[]
+  // many-to-many WITHOUT data → implicit join table managed by Prisma
+  tags        Tag[]
+
+  @@map("courses")
+}
+
+model Lesson {
+  id              String @id @default(cuid())
+  title           String
+  position        Int
+  durationMinutes Int
+  courseId        String
+  // Deleting a course deletes its lessons
+  course          Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, position])
+  @@map("lessons")
+}
+
+model Student {
+  id          String       @id @default(cuid())
+  name        String
+  email       String       @unique
+  enrollments Enrollment[]
+
+  @@map("students")
+}
+
+// The link itself has data (when the student enrolled), so it is a model of its own
+model Enrollment {
+  studentId  String
+  courseId   String
+  enrolledAt DateTime @default(now())
+  student    Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  // A student can enroll in a course only once
+  @@id([studentId, courseId])
+  @@index([courseId])
+  @@map("enrollments")
+}
+
+model Tag {
+  id      String   @id @default(cuid())
+  name    String   @unique
+  courses Course[]
+
+  @@map("tags")
+}
