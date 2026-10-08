@@ -1,0 +1,42 @@
+generator client {
+  provider = "prisma-client-js"
+  // Per-demo output: demos share one @prisma/client install in the pnpm workspace,
+  // so the default location would be overwritten by whichever demo generated last.
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  id           String     @id @default(cuid())
+  owner        String
+  // Integer cents; a CHECK (balanceCents >= 0) constraint is added in the migration SQL
+  balanceCents Int
+  // Optimistic locking: bumped on every change, exposed to clients as the ETag
+  version      Int        @default(0)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  outgoing     Transfer[] @relation("from")
+  incoming     Transfer[] @relation("to")
+
+  @@map("accounts")
+}
+
+model Transfer {
+  id             String   @id @default(cuid())
+  // The same key always means the same transfer: retries can't move money twice
+  idempotencyKey String?  @unique
+  fromId         String
+  toId           String
+  amountCents    Int
+  createdAt      DateTime @default(now())
+  from           Account  @relation("from", fields: [fromId], references: [id])
+  to             Account  @relation("to", fields: [toId], references: [id])
+
+  @@index([fromId])
+  @@index([toId])
+  @@map("transfers")
+}
