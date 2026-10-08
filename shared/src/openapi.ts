@@ -60,12 +60,15 @@ export const generateOpenApiDocument = (registry: OpenAPIRegistry, info: ApiInfo
     info: { version: '1.0.0', ...info },
   });
 
-/** Serves the raw document at /api/docs/openapi.json and Swagger UI at /api/docs. */
-export const docsRouter = (document: object): Router => {
+/**
+ * Serves the raw document at `<basePath>/openapi.json` and Swagger UI at `<basePath>`
+ * (default /api/docs). Versioned APIs mount one per version, e.g. /api/v2/docs.
+ */
+export const docsRouter = (document: object, basePath = '/api/docs'): Router => {
   const router = Router();
-  router.get('/api/docs/openapi.json', (_req, res) => {
+  router.get(`${basePath}/openapi.json`, (_req, res) => {
     res.json(document);
   });
-  router.use('/api/docs', swaggerUi.serve, swaggerUi.setup(document));
+  router.use(basePath, swaggerUi.serveFiles(document), swaggerUi.setup(document));
   return router;
 };

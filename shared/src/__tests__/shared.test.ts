@@ -114,6 +114,7 @@ describe('normalizeError', () => {
   it.each([
     [{ code: 'P2002' }, 409],
     [{ code: 'P2025' }, 404],
+    [{ code: 'P2003' }, 422],
     [{ name: 'CastError' }, 400],
     [{ name: 'ValidationError', message: 'title is required' }, 400],
     ['a thrown string', 500],

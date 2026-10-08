@@ -4,6 +4,7 @@ export * from './async-handler';
 export * from './error-handler';
 export * from './validate';
 export * from './logger';
+export * from './log-context';
 export * from './request-context';
 export * from './health';
 export * from './server';

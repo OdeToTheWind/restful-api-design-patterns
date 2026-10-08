@@ -34,6 +34,8 @@ export const normalizeError = (err: unknown): NormalizedError => {
   if (hasProp(err, 'code') && typeof err.code === 'string') {
     if (err.code === 'P2002') return { statusCode: 409, message: 'Resource already exists', errors: null };
     if (err.code === 'P2025') return { statusCode: 404, message: 'Resource not found', errors: null };
+    // Foreign key violation: the request refers to a related record that doesn't exist
+    if (err.code === 'P2003') return { statusCode: 422, message: 'Referenced resource does not exist', errors: null };
   }
 
   // Mongoose errors
