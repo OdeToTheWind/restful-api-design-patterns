@@ -157,6 +157,28 @@ describe('download, list and delete', () => {
   });
 });
 
+describe('POST /api/files/cleanup-abandoned', () => {
+  it('removes expired PENDING uploads and deletes their storage objects', async () => {
+    const expiredFile = file({
+      id: 'expired-1',
+      status: 'PENDING',
+      createdAt: new Date(Date.now() - 600 * 1000),
+      key: 'uploads/expired-1',
+    });
+    jest.mocked(prisma.file.findMany).mockResolvedValue([expiredFile]);
+    s3Mock.on(DeleteObjectCommand).resolves({});
+
+    const res = await request(app).post('/api/files/cleanup-abandoned');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.cleanedCount).toBe(1);
+    expect(res.body.data.cleanedIds).toEqual(['expired-1']);
+    expect(s3Mock.commandCalls(DeleteObjectCommand)).toHaveLength(1);
+    expect(prisma.file.delete).toHaveBeenCalledWith({ where: { id: 'expired-1' } });
+    expectToMatchSpec(res, 'post', '/api/files/cleanup-abandoned');
+  });
+});
+
 it('readiness includes the storage bucket', async () => {
   jest.mocked(prisma.$queryRaw).mockResolvedValue([] as never);
   s3Mock.on(HeadBucketCommand).rejects(new Error('connect ECONNREFUSED'));

@@ -23,7 +23,30 @@ const fakeQueue = () => {
     }),
     getJob: jest.fn(async (id: string) => {
       const job = jobs.get(id);
-      return job && { ...job, failedReason: undefined, finishedOn: undefined, getState: async () => job.state };
+      return (
+        job && {
+          ...job,
+          failedReason: job.state === 'failed' ? 'SMTP 550 permanent failure' : undefined,
+          finishedOn: job.state === 'failed' ? Date.now() : undefined,
+          getState: async () => job.state,
+          retry: jest.fn(async () => {
+            job.state = 'waiting';
+          }),
+        }
+      );
+    }),
+    getFailed: jest.fn(async () => {
+      return [...jobs.values()]
+        .filter((j) => j.state === 'failed')
+        .map((j) => ({
+          ...j,
+          failedReason: 'SMTP 550 permanent failure',
+          finishedOn: Date.now(),
+          getState: async () => j.state,
+          retry: jest.fn(async () => {
+            j.state = 'waiting';
+          }),
+        }));
     }),
   };
   return { queue: queue as unknown as EmailQueue & typeof queue, jobs };
@@ -146,5 +169,46 @@ describe('email processor (worker side)', () => {
   it('treats network errors (no SMTP code) as temporary', async () => {
     const transport = { sendMail: jest.fn().mockRejectedValue(new Error('ECONNREFUSED')) };
     await expect(createEmailProcessor(transport as never, 'from@example.com')(job(2))).rejects.toThrow('ECONNREFUSED');
+  });
+});
+
+describe('Dead-letter endpoints', () => {
+  it('lists failed jobs and allows re-queuing', async () => {
+    const { queue, jobs } = fakeQueue();
+    jobs.set('failed-job-1', {
+      id: 'failed-job-1',
+      data: welcome,
+      state: 'failed',
+      attemptsMade: 3,
+    });
+    const app = createApp({ queue });
+
+    const listRes = await request(app).get('/api/admin/emails/failed');
+    expect(listRes.status).toBe(200);
+    expect(listRes.body.data.count).toBe(1);
+    expect(listRes.body.data.jobs[0].jobId).toBe('failed-job-1');
+    expectToMatchSpec(listRes, 'get', '/api/admin/emails/failed');
+
+    const retryRes = await request(app).post('/api/admin/emails/failed/failed-job-1/retry');
+    expect(retryRes.status).toBe(200);
+    expect(retryRes.body.data.retried).toBe(true);
+    expectToMatchSpec(retryRes, 'post', '/api/admin/emails/failed/{jobId}/retry');
+  });
+
+  it('404 on missing failed job and 409 if job is not in failed state', async () => {
+    const { queue, jobs } = fakeQueue();
+    jobs.set('active-job', {
+      id: 'active-job',
+      data: welcome,
+      state: 'active',
+      attemptsMade: 1,
+    });
+    const app = createApp({ queue });
+
+    const notFoundRes = await request(app).post('/api/admin/emails/failed/missing-job/retry');
+    expect(notFoundRes.status).toBe(404);
+
+    const conflictRes = await request(app).post('/api/admin/emails/failed/active-job/retry');
+    expect(conflictRes.status).toBe(409);
   });
 });

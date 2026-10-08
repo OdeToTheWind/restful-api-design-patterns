@@ -1,0 +1,14 @@
+{
+    admin off
+    local_certs
+}
+
+# Reverse proxy with TLS termination fronting the Day 46 Express API
+:80, :443 {
+    tls internal
+    reverse_proxy api:3046 {
+        header_up X-Forwarded-Proto {scheme}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Host {host}
+    }
+}

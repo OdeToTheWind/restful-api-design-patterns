@@ -8,7 +8,7 @@ export const EMAIL_QUEUE = 'emails';
 /** BullMQ needs maxRetriesPerRequest: null so blocking commands aren't cut off. */
 export const createRedisConnection = () => new IORedis(config.redisUrl, { maxRetriesPerRequest: null });
 
-export type EmailQueue = Pick<Queue<EmailRequest>, 'add' | 'getJob'>;
+export type EmailQueue = Pick<Queue<EmailRequest>, 'add' | 'getJob' | 'getFailed'>;
 
 /**
  * Jobs survive restarts (they're in Redis), are retried with exponential backoff
