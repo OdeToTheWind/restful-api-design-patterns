@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Real-database smoke test for the intermediate demos (Days 26–49).
+# Real-infrastructure smoke test for the intermediate demos (Days 26–50).
 #
-# Starts throwaway PostgreSQL, MongoDB and Redis containers (no volumes, removed on exit),
+# Starts throwaway PostgreSQL, MongoDB, Redis, SeaweedFS (S3) and Mailpit containers (no volumes, removed on exit),
 # applies each demo's real Prisma migrations, starts every demo from dist/ and
 # checks its behaviour over HTTP. Your own containers, volumes and .env files are
 # not touched: everything is passed through environment variables.
@@ -19,6 +19,14 @@ PG_CONTAINER="restful-smoke-pg-$SUFFIX"
 MONGO_CONTAINER="restful-smoke-mongo-$SUFFIX"
 REDIS_CONTAINER="restful-smoke-redis-$SUFFIX"
 REDIS_PORT="${SMOKE_REDIS_PORT:-56379}"
+QUEUE_REDIS_CONTAINER="restful-smoke-queue-redis-$SUFFIX"
+QUEUE_REDIS_PORT="${SMOKE_QUEUE_REDIS_PORT:-56380}"
+S3_CONTAINER="restful-smoke-s3-$SUFFIX"
+S3_PORT="${SMOKE_S3_PORT:-58333}"
+MAILPIT_CONTAINER="restful-smoke-mailpit-$SUFFIX"
+MAILPIT_SMTP_PORT="${SMOKE_MAILPIT_SMTP_PORT:-51025}"
+MAILPIT_HTTP_PORT="${SMOKE_MAILPIT_HTTP_PORT:-58025}"
+WORKER_PID=""
 PG="postgresql://postgres:smoke@127.0.0.1:$PG_PORT"
 TMP="$(mktemp -d)"
 SERVER_PID=""
@@ -29,7 +37,8 @@ export NODE_ENV=development AUTH_RATE_LIMIT=1000 LOGIN_ACCOUNT_LIMIT=1000 LOG_LE
 
 cleanup() {
   [ -n "$SERVER_PID" ] && kill "$SERVER_PID" 2>/dev/null
-  docker rm -f "$PG_CONTAINER" "$MONGO_CONTAINER" "$REDIS_CONTAINER" >/dev/null 2>&1
+  [ -n "$WORKER_PID" ] && kill "$WORKER_PID" 2>/dev/null
+  docker rm -f "$PG_CONTAINER" "$MONGO_CONTAINER" "$REDIS_CONTAINER" "$QUEUE_REDIS_CONTAINER" "$S3_CONTAINER" "$MAILPIT_CONTAINER" >/dev/null 2>&1
   rm -rf "$TMP"
 }
 trap cleanup EXIT
@@ -79,9 +88,18 @@ echo "Starting throwaway databases…"
 docker run -d --rm --name "$PG_CONTAINER" -e POSTGRES_PASSWORD=smoke -p "127.0.0.1:$PG_PORT:5432" postgres:16 >/dev/null || exit 1
 docker run -d --rm --name "$MONGO_CONTAINER" -p "127.0.0.1:$MONGO_PORT:27017" mongo:7 >/dev/null || exit 1
 docker run -d --rm --name "$REDIS_CONTAINER" -p "127.0.0.1:$REDIS_PORT:6379" redis:7-alpine >/dev/null || exit 1
+docker run -d --rm --name "$QUEUE_REDIS_CONTAINER" -p "127.0.0.1:$QUEUE_REDIS_PORT:6379" redis:7-alpine >/dev/null || exit 1
+# S3-compatible storage (SeaweedFS) WITH credentials, so signatures are really checked
+printf '{"identities":[{"name":"smoke","credentials":[{"accessKey":"smoke-key","secretKey":"smoke-secret-123"}],"actions":["Admin","Read","Write","List","Tagging"]}]}' >"$TMP/s3.json"
+chmod 644 "$TMP/s3.json"
+docker run -d --rm --name "$S3_CONTAINER" -v "$TMP/s3.json:/etc/seaweedfs/s3.json:ro" -p "127.0.0.1:$S3_PORT:8333" \
+  chrislusf/seaweedfs server -s3 -s3.config=/etc/seaweedfs/s3.json >/dev/null || exit 1
+docker run -d --rm --name "$MAILPIT_CONTAINER" -p "127.0.0.1:$MAILPIT_SMTP_PORT:1025" -p "127.0.0.1:$MAILPIT_HTTP_PORT:8025" axllent/mailpit >/dev/null || exit 1
 timeout 120 sh -c "until docker exec $PG_CONTAINER pg_isready -U postgres -h 127.0.0.1 >/dev/null 2>&1; do sleep 1; done" || { echo "Postgres did not start"; exit 1; }
 timeout 120 sh -c "until docker exec $MONGO_CONTAINER mongosh --quiet --eval 'db.runCommand({ping:1}).ok' >/dev/null 2>&1; do sleep 1; done" || { echo "MongoDB did not start"; exit 1; }
-for db in day27 day28 day29 day31 day32 day33 day35 day37 day38 day43; do docker exec "$PG_CONTAINER" createdb -U postgres "$db"; done
+timeout 120 sh -c "until [ \"\$(curl -s -o /dev/null -w %{http_code} localhost:$S3_PORT)\" != 000 ]; do sleep 1; done" || { echo "S3 storage did not start"; exit 1; }
+timeout 60 sh -c "until curl -sf localhost:$MAILPIT_HTTP_PORT/api/v1/messages >/dev/null; do sleep 1; done" || { echo "Mailpit did not start"; exit 1; }
+for db in day27 day28 day29 day31 day32 day33 day35 day36 day37 day38 day39 day41 day43 day48 day50; do docker exec "$PG_CONTAINER" createdb -U postgres "$db"; done
 
 # ---- Day 26 ----------------------------------------------------------------
 echo "== Day 26 (MongoDB + Mongoose)"
@@ -314,6 +332,145 @@ check "environment from NODE_ENV" production "$(req GET localhost:4049/api/info 
 check ".env.production defaults applied (flag off)" false "$(field data.features.newGreeting)"
 check "admin config → 200 with key" 200 "$(curl -s -o "$TMP/body" -w '%{http_code}' -H "X-Admin-Key: $KEY49" localhost:4049/api/admin/config)"
 check "secret redacted" "[set]" "$(field data.adminApiKey)"
+stop
+
+# ---- Day 34 ----------------------------------------------------------------
+echo "== Day 34 (log context + redaction)"
+TOKEN34=$(cd "$DEMOS/day_34_winston_log_context" && node -e "console.log(require('jsonwebtoken').sign({id:'user-34',email:'a@b.co',role:'USER'}, process.env.JWT_SECRET))")
+LOG_LEVEL=debug start day_34_winston_log_context 4034
+curl -s -o "$TMP/body" -X POST localhost:4034/api/orders -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN34" -H 'X-Request-Id: smoke-req-34' \
+  -d '{"items":[{"sku":"book-rest","quantity":1}],"cardToken":"tok_live_secret_9999"}' >/dev/null
+req GET "localhost:4034/api/debug/logs?requestId=smoke-req-34" >/dev/null
+check "service log carries the request's userId" user-34 "$(node -e 'const l=JSON.parse(require("fs").readFileSync(process.argv[1])).data.find(e=>e.message==="charging card");console.log(l&&l.userId)' "$TMP/body")"
+check "card token redacted in the written log" 0 "$(grep -c tok_live_secret_9999 "$TMP/body" || true)"
+stop
+
+# ---- Day 36 ----------------------------------------------------------------
+echo "== Day 36 (soft delete)"
+export DATABASE_URL="$PG/day36"
+migrate day_36_soft_delete_pattern
+start day_36_soft_delete_pattern 4036; B=localhost:4036/api/articles
+req POST $B '{"slug":"rest-tips","title":"REST tips","body":"v1"}' >/dev/null; OLD=$(field data.id)
+check "duplicate active slug → 409" 409 "$(req POST $B '{"slug":"rest-tips","title":"Again","body":"x"}')"
+check "delete moves to trash → 200" 200 "$(req DELETE "$B/$OLD")"
+check "deleted article is hidden → 404" 404 "$(req GET $B/rest-tips)"
+check "row still exists (soft delete)" 1 "$(docker exec "$PG_CONTAINER" psql -U postgres -d day36 -tAc "SELECT count(*) FROM articles WHERE \"deletedAt\" IS NOT NULL")"
+check "slug reusable once the old one is deleted → 201" 201 "$(req POST $B '{"slug":"rest-tips","title":"REST tips v2","body":"v2"}')"
+NEW=$(field data.id)
+check "restoring the old one now conflicts (partial unique index) → 409" 409 "$(req POST "$B/$OLD/restore")"
+req DELETE "$B/$NEW" >/dev/null
+check "restore after the slug is free → 200" 200 "$(req POST "$B/$OLD/restore")"
+check "purge only from the trash → 404 for an active article" 404 "$(req DELETE "$B/$OLD/permanent")"
+check "purge from the trash → 200" 200 "$(req DELETE "$B/$NEW/permanent")"
+stop
+
+# ---- Day 39 ----------------------------------------------------------------
+echo "== Day 39 (pre-signed uploads to S3-compatible storage)"
+export DATABASE_URL="$PG/day39" S3_ENDPOINT="http://127.0.0.1:$S3_PORT" S3_ACCESS_KEY_ID=smoke-key S3_SECRET_ACCESS_KEY=smoke-secret-123 S3_CREATE_BUCKET=true S3_BUCKET=uploads
+migrate day_39_file_upload_cloud_storage
+start day_39_file_upload_cloud_storage 4039; B=localhost:4039/api/files
+probes 4039
+head -c 2048 /dev/urandom > "$TMP/upload.png"
+req POST $B '{"filename":"diagram.png","contentType":"image/png","sizeBytes":2048}' >/dev/null
+FILE=$(field data.file.id); URL=$(field data.upload.url)
+check "PUT straight to storage with the signed URL → 200" 200 "$(curl -s -o /dev/null -w '%{http_code}' -X PUT -H 'Content-Type: image/png' --data-binary @"$TMP/upload.png" "$URL")"
+check "complete → READY" READY "$(req POST "$B/$FILE/complete" >/dev/null; field data.status)"
+req GET "$B/$FILE/download" >/dev/null
+check "downloaded bytes match the upload" true "$(curl -s "$(field data.url)" | cmp -s - "$TMP/upload.png" && echo true || echo false)"
+check "tampered signed URL is refused by storage" 403 "$(curl -s -o /dev/null -w '%{http_code}' -X PUT -H 'Content-Type: image/png' --data-binary @"$TMP/upload.png" "${URL/X-Amz-Expires=300/X-Amz-Expires=3000}")"
+req POST $B '{"filename":"small.png","contentType":"image/png","sizeBytes":10}' >/dev/null
+LIAR=$(field data.file.id); curl -s -o /dev/null -X PUT -H 'Content-Type: image/png' --data-binary @"$TMP/upload.png" "$(field data.upload.url)"
+check "file bigger than declared → 422 and removed" 422 "$(req POST "$B/$LIAR/complete")"
+stop
+
+# ---- Day 40 ----------------------------------------------------------------
+echo "== Day 40 (email queue + worker)"
+export REDIS_URL="redis://127.0.0.1:$QUEUE_REDIS_PORT" SMTP_HOST=127.0.0.1 SMTP_PORT="$MAILPIT_SMTP_PORT"
+start day_40_email_notifications_queue 4040; B=localhost:4040/api/emails
+check "accepted for delivery → 202" 202 "$(curl -s -o "$TMP/body" -w '%{http_code}' -X POST $B -H 'Content-Type: application/json' -H 'Idempotency-Key: smoke-welcome-0001' -d '{"type":"welcome","to":"ada@example.com","data":{"name":"Ada"}}')"
+JOB=$(field data.jobId)
+check "no worker yet: the job waits in Redis" waiting "$(req GET "$B/$JOB" >/dev/null; field data.state)"
+(cd "$DEMOS/day_40_email_notifications_queue" && exec node dist/worker.js >"$TMP/worker.log" 2>&1) &
+WORKER_PID=$!
+for _ in $(seq 1 50); do req GET "$B/$JOB" >/dev/null; [ "$(field data.state)" = completed ] && break; sleep 0.2; done
+check "worker delivered it" completed "$(field data.state)"
+check "email arrived in the inbox (Mailpit)" true "$(curl -s "localhost:$MAILPIT_HTTP_PORT/api/v1/messages" | grep -q 'Welcome, Ada!' && echo true || echo false)"
+check "same Idempotency-Key → not queued again" true "$(curl -s -o "$TMP/body" -X POST $B -H 'Content-Type: application/json' -H 'Idempotency-Key: smoke-welcome-0001' -d '{"type":"welcome","to":"ada@example.com","data":{"name":"Ada"}}'; field data.duplicate)"
+kill -TERM "$WORKER_PID"; wait "$WORKER_PID"; check "worker shuts down cleanly" 0 "$?"; WORKER_PID=""
+stop
+
+# ---- Day 41 ----------------------------------------------------------------
+echo "== Day 41 (signed webhooks)"
+export DATABASE_URL="$PG/day41" WEBHOOK_SECRET="whsec_smoke_only_secret_at_least_32_chars"
+migrate day_41_webhook_endpoints
+start day_41_webhook_endpoints 4041; B=localhost:4041/api
+req POST $B/orders '{"amountCents":4999}' >/dev/null; ORDER41=$(field data.id)
+webhook() { # type eventId [secret]
+  local body="{\"id\":\"$2\",\"type\":\"$1\",\"data\":{\"orderId\":\"$ORDER41\",\"amountCents\":4999}}"
+  local sig; sig=$(cd "$DEMOS/day_41_webhook_endpoints" && node -e "console.log(require('./dist/webhooks/signature').signatureHeader(process.argv[1], process.argv[2]))" "${3:-$WEBHOOK_SECRET}" "$body")
+  curl -s -o "$TMP/body" -w '%{http_code}' -X POST "$B/webhooks/payments" -H 'Content-Type: application/json' -H "Webhook-Signature: $sig" --data-binary "$body"
+}
+check "forged signature → 401" 401 "$(webhook payment.succeeded evt_forged wrong-secret-wrong-secret-wrong-secret)"
+check "signed event → processed" processed "$(webhook payment.succeeded evt_smoke_1 >/dev/null; field data.status)"
+check "order is PAID" PAID "$(req GET "$B/orders/$ORDER41" >/dev/null; field data.status)"
+check "redelivery → duplicate" duplicate "$(webhook payment.succeeded evt_smoke_1 >/dev/null; field data.status)"
+check "late payment.failed can't undo PAID" PAID "$(webhook payment.failed evt_smoke_2 >/dev/null; req GET "$B/orders/$ORDER41" >/dev/null; field data.status)"
+check "events stored once each" 2 "$(docker exec "$PG_CONTAINER" psql -U postgres -d day41 -tAc 'SELECT count(*) FROM webhook_events')"
+stop
+
+# ---- Day 42 / Day 44 (no database) -------------------------------------------
+echo "== Day 42 (API versioning)"
+start day_42_api_versioning_uri 4042
+check "v1 announces deprecation" true "$(req GET localhost:4042/api/v1/products >/dev/null; [ -n "$(header deprecation)" ] && [ -n "$(header sunset)" ] && echo true || echo false)"
+check "v2 price object" 39.99 "$(req GET localhost:4042/api/v2/products/p-1 >/dev/null; field data.price.amount)"
+stop
+echo "== Day 44 (checkout with fakes)"
+start day_44_test_doubles_coverage 4044
+check "checkout → 201" 201 "$(req POST localhost:4044/api/checkout '{"email":"a@b.co","items":[{"sku":"MUG-API","quantity":1}],"cardToken":"tok_ok"}')"
+check "declined card → 402" 402 "$(req POST localhost:4044/api/checkout '{"email":"a@b.co","items":[{"sku":"MUG-API","quantity":1}],"cardToken":"tok_declined"}')"
+stop
+
+# ---- Day 48 ----------------------------------------------------------------
+echo "== Day 48 (relationships + N+1)"
+export DATABASE_URL="$PG/day48"
+migrate day_48_relationships_prisma
+start day_48_relationships_prisma 4048; B=localhost:4048/api
+for n in 1 2 3; do req POST $B/courses "{\"title\":\"Course $n\",\"lessons\":[{\"title\":\"Intro\",\"durationMinutes\":10},{\"title\":\"Deep dive\",\"durationMinutes\":30}],\"tags\":[\"api\",\"rest\"]}" >/dev/null; done
+COURSE=$(field data.id)
+check "nested write created lessons in order" 2 "$(field data.lessons.1.position)"
+req GET $B/courses >/dev/null; check "proper list: 1 operation" 1 "$(header x-prisma-operations)"
+req GET $B/courses/naive >/dev/null; check "naive list: 1 + 3N operations (N=3)" 10 "$(header x-prisma-operations)"
+req POST $B/students '{"name":"Ada","email":"ada@example.com"}' >/dev/null; STUDENT=$(field data.id)
+check "enroll → 201" 201 "$(req POST "$B/courses/$COURSE/enrollments" "{\"studentId\":\"$STUDENT\"}")"
+check "enroll twice → 409" 409 "$(req POST "$B/courses/$COURSE/enrollments" "{\"studentId\":\"$STUDENT\"}")"
+check "unknown student → 422 (foreign key)" 422 "$(req POST "$B/courses/$COURSE/enrollments" '{"studentId":"clx0000000000000000000999"}')"
+check "deleting the course cascades to enrollments" 0 "$(req DELETE "$B/courses/$COURSE" >/dev/null; req GET "$B/students/$STUDENT/courses" >/dev/null; node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1])).data.length)' "$TMP/body")"
+stop
+
+# ---- Day 50 ----------------------------------------------------------------
+echo "== Day 50 (transactions)"
+export DATABASE_URL="$PG/day50"
+migrate day_50_database_transactions
+start day_50_database_transactions 4050; B=localhost:4050/api
+req POST $B/accounts '{"owner":"A","initialBalanceCents":10000}' >/dev/null; ACC_A=$(field data.id)
+req POST $B/accounts '{"owner":"B"}' >/dev/null; ACC_B=$(field data.id)
+for i in $(seq 1 20); do
+  curl -s -o /dev/null -w '%{http_code}\n' -X POST $B/transfers -H 'Content-Type: application/json' \
+    -d "{\"fromId\":\"$ACC_A\",\"toId\":\"$ACC_B\",\"amountCents\":1000}" >>"$TMP/transfer-codes" &
+done
+wait_for_transfers() { for _ in $(seq 1 100); do [ "$(wc -l <"$TMP/transfer-codes")" -ge 20 ] && return; sleep 0.1; done; }
+wait_for_transfers
+check "20 concurrent transfers: exactly 10 succeed" 10 "$(grep -c '^201$' "$TMP/transfer-codes")"
+check "…and 10 are refused for insufficient funds" 10 "$(grep -c '^409$' "$TMP/transfer-codes")"
+check "A is exactly empty (never negative)" 0 "$(req GET "$B/accounts/$ACC_A" >/dev/null; field data.balanceCents)"
+check "no money created or lost" 10000 "$(docker exec "$PG_CONTAINER" psql -U postgres -d day50 -tAc 'SELECT sum("balanceCents") FROM accounts')"
+check "idempotent transfer → 201" 201 "$(curl -s -o /dev/null -w '%{http_code}' -X POST $B/transfers -H 'Content-Type: application/json' -H 'Idempotency-Key: smoke-transfer-0001' -d "{\"fromId\":\"$ACC_B\",\"toId\":\"$ACC_A\",\"amountCents\":500}")"
+check "same key again → 200 replay" 200 "$(curl -s -o /dev/null -w '%{http_code}' -X POST $B/transfers -H 'Content-Type: application/json' -H 'Idempotency-Key: smoke-transfer-0001' -d "{\"fromId\":\"$ACC_B\",\"toId\":\"$ACC_A\",\"amountCents\":500}")"
+check "…money moved once" 500 "$(req GET "$B/accounts/$ACC_A" >/dev/null; field data.balanceCents)"
+ETAG=$(header etag)
+check "PATCH without If-Match → 428" 428 "$(req PATCH "$B/accounts/$ACC_A" '{"owner":"Ada"}')"
+check "PATCH with current ETag → 200" 200 "$(curl -s -o /dev/null -w '%{http_code}' -X PATCH "$B/accounts/$ACC_A" -H 'Content-Type: application/json' -H "If-Match: $ETAG" -d '{"owner":"Ada"}')"
+check "PATCH with the same (now stale) ETag → 412" 412 "$(curl -s -o /dev/null -w '%{http_code}' -X PATCH "$B/accounts/$ACC_A" -H 'Content-Type: application/json' -H "If-Match: $ETAG" -d '{"owner":"Eve"}')"
 stop
 
 echo "== Startup without JWT_SECRET (Day 28)"
