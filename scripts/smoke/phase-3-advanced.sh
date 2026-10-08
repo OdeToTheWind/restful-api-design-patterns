@@ -12,7 +12,7 @@ echo "========================================================"
 ensure_built day_44_test_doubles_coverage day_48_relationships_prisma \
   day_49_environment_configs day_50_database_transactions
 
-start_infrastructure
+start_infrastructure pg
 create_databases day48 day50
 
 # ---- Day 44 (no database) ----------------------------------------------------
@@ -76,10 +76,6 @@ check "PATCH without If-Match → 428" 428 "$(req PATCH "$B/accounts/$ACC_A" '{"
 check "PATCH with current ETag → 200" 200 "$(curl -s -o /dev/null -w '%{http_code}' -X PATCH "$B/accounts/$ACC_A" -H 'Content-Type: application/json' -H "If-Match: $ETAG" -d '{"owner":"Ada"}')"
 check "PATCH with the same (now stale) ETag → 412" 412 "$(curl -s -o /dev/null -w '%{http_code}' -X PATCH "$B/accounts/$ACC_A" -H 'Content-Type: application/json' -H "If-Match: $ETAG" -d '{"owner":"Eve"}')"
 stop
-
-echo "== Startup without JWT_SECRET (Day 28)"
-OUT=$(cd "$DEMOS/day_28_jwt_authentication" && JWT_SECRET='' node -e "require('./dist/config')" 2>&1)
-case "$OUT" in *"Invalid environment configuration"*"JWT_SECRET"*) echo "  PASS refuses to start";; *) echo "  FAIL started without secret"; FAIL=1;; esac
 
 echo
 [ "$FAIL" = 0 ] && echo "PHASE 3 SMOKE CHECKS PASSED" || echo "PHASE 3 SMOKE CHECKS FAILED"

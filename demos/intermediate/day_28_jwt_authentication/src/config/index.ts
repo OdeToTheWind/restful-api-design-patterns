@@ -8,7 +8,7 @@ dotenv.config();
 // JWT_SECRET has no default on purpose: never sign tokens with a secret committed to git.
 const env = loadEnv(
   z.object({
-    PORT: envFields.port(3027),
+    PORT: envFields.port(3028),
     NODE_ENV: envFields.nodeEnv,
     DATABASE_URL: z.string().url(),
     JWT_SECRET: envFields.secret(32),

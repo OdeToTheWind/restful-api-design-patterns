@@ -7,7 +7,7 @@ dotenv.config();
 // Validated once at startup; any invalid value stops the app with a list of every problem
 const env = loadEnv(
   z.object({
-    PORT: envFields.port(3025),
+    PORT: envFields.port(3026),
     NODE_ENV: envFields.nodeEnv,
     MONGO_URI: z.string().url().default('mongodb://localhost:27017/restful-api-day26'),
     // Allowed browser origins, comma-separated. Empty = no cross-origin access.

@@ -14,7 +14,7 @@ ensure_built day_34_winston_log_context day_35_seeding_migrations day_36_soft_de
   day_40_email_notifications_queue day_41_webhook_endpoints day_42_api_versioning_uri \
   day_43_auth_sessions_cookies
 
-start_infrastructure
+start_infrastructure pg queue-redis s3 mailpit
 create_databases day35 day36 day37 day38 day39 day41 day43
 
 # ---- Day 34 ----------------------------------------------------------------
@@ -110,7 +110,7 @@ check "tampered signed URL is refused by storage" 403 "$(curl -s -o /dev/null -w
 req POST $B '{"filename":"small.png","contentType":"image/png","sizeBytes":10}' >/dev/null
 LIAR=$(field data.file.id); curl -s -o /dev/null -X PUT -H 'Content-Type: image/png' --data-binary @"$TMP/upload.png" "$(field data.upload.url)"
 check "file bigger than declared → 422 and removed" 422 "$(req POST "$B/$LIAR/complete")"
-check "cleanup abandoned endpoint → 200" 200 "$(req POST localhost:4039/api/files/cleanup-abandoned)"
+(cd "$DEMOS/day_39_file_upload_cloud_storage" && node dist/cleanup.js >/dev/null); check "cleanup script exits cleanly" 0 "$?"
 stop
 
 # ---- Day 40 ----------------------------------------------------------------
@@ -120,7 +120,8 @@ start day_40_email_notifications_queue 4040; B=localhost:4040/api/emails
 check "accepted for delivery → 202" 202 "$(curl -s -o "$TMP/body" -w '%{http_code}' -X POST $B -H 'Content-Type: application/json' -H 'Idempotency-Key: smoke-welcome-0001' -d '{"type":"welcome","to":"ada@example.com","data":{"name":"Ada"}}')"
 JOB=$(field data.jobId)
 check "no worker yet: the job waits in Redis" waiting "$(req GET "$B/$JOB" >/dev/null; field data.state)"
-check "dead-letter list endpoint → 200" 200 "$(req GET localhost:4040/api/admin/emails/failed)"
+check "dead-letter list rejects unauthenticated → 401" 401 "$(req GET localhost:4040/api/admin/emails/failed)"
+check "dead-letter list endpoint with key → 200" 200 "$(curl -s -o /dev/null -w '%{http_code}' -X GET localhost:4040/api/admin/emails/failed -H 'X-Admin-Key: day40-admin-secret-key')"
 (cd "$DEMOS/day_40_email_notifications_queue" && exec node dist/worker.js >"$TMP/worker.log" 2>&1) &
 WORKER_PID=$!
 for _ in $(seq 1 50); do req GET "$B/$JOB" >/dev/null; [ "$(field data.state)" = completed ] && break; sleep 0.2; done

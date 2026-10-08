@@ -38,15 +38,6 @@ registry.registerPath({
 });
 registry.registerPath({
   method: 'post',
-  path: '/api/files/cleanup-abandoned',
-  tags: ['Files'],
-  summary: 'Clean up expired PENDING uploads and their storage objects',
-  responses: {
-    200: api.success('Cleanup summary', z.object({ cleanedCount: z.number().int(), cleanedIds: z.array(z.string()) })),
-  },
-});
-registry.registerPath({
-  method: 'post',
   path: '/api/files/{id}/complete',
   tags: ['Files'],
   summary: '3. Verify the uploaded object and mark the file READY',

@@ -2,7 +2,7 @@
 
 [![GitHub Repo](https://img.shields.io/badge/GitHub-OdeToTheWind%2Frestful--api--design--patterns-blue?style=for-the-badge&logo=github)](https://github.com/OdeToTheWind/restful-api-design-patterns)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
-[![Node.js](https://img.shields.io/badge/Node.js-20+-green?style=for-the-badge&logo=node.js)](https://nodejs.org)
+[![Node.js](https://img.shields.io/badge/Node.js-22+-green?style=for-the-badge&logo=node.js)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org)
 [![Express](https://img.shields.io/badge/Express-4.x-black?style=for-the-badge&logo=express)](https://expressjs.com)
 [![Prisma](https://img.shields.io/badge/Prisma-ORM-orange?style=for-the-badge&logo=prisma)](https://www.prisma.io)
@@ -63,18 +63,20 @@ Whether you're a beginner solidifying fundamentals or an experienced engineer re
 │   └── demo.Dockerfile         # Production image for any demo (Day 46)
 ├── scripts/
 │   ├── new-day.mjs             # Scaffold a new day from demos/_template (pnpm new-day)
-│   ├── smoke-test.sh           # Real-database smoke test (pnpm smoke)
+│   ├── smoke-test.sh           # Runs every smoke phase (pnpm smoke)
+│   ├── smoke/                  # common.sh + phase-1-core / phase-2-services / phase-3-advanced
 │   └── coverage-summary.mjs    # Coverage table for the CI job summary
 ├── demos/
 │   ├── _template/              # Copy this to start a new day
 │   ├── beginner/               # Demos 01–25 (standalone lesson snapshots)
 │   ├── intermediate/           # Demos 26–50
-│   ├── advanced/               # Demos 51–75
-│   └── real-world/             # Demos 76–100
+│   ├── advanced/               # Demos 51–75 (not started)
+│   └── real-world/             # Demos 76–100 (not started)
 └── shared/                     # @restful/shared — used by Day 26 onward
-    └── src/                    # ApiResponse, AppError, asyncHandler, errorHandler,
-                                # notFoundHandler, validateBody/Query/Params, logger (request
-                                # context + redaction), requestId, requestLogger, healthRouter, startServer,
+    └── src/                    # ApiResponse, AppError, asyncHandler, errorHandler, notFoundHandler,
+                                # validateBody/Query/Params, logger (request context + redaction),
+                                # requestId, requestLogger, healthRouter, startServer, docsRouter (OpenAPI),
+                                # pagination helpers, loadEnv/envFields, createContractMatcher (testing),
                                 # typed req.user / req.id
 ```
 ---
@@ -106,7 +108,7 @@ Whether you're a beginner solidifying fundamentals or an experienced engineer re
 | 22  | Static Assets API                         | ✅ Completed      | Serving static files via API |
 | 23  | Bulk Operations Intro                     | ✅ Completed      | Bulk create/update operations |
 | 24  | Simple Rate Limiting                      | ✅ Completed      | Basic rate limiting implementation |
-| 25  | MVC Refractor                             | ✅ Completed      | MVC architecture refactoring |
+| 25  | MVC Refactor                              | ✅ Completed      | MVC architecture refactoring |
 | 26  | MongoDB Mongoose TODOS                    | ✅ Completed      | MongoDB + Mongoose, schemas, ODM CRUD |
 | 27  | Postgres Prisma Users                     | ✅ Completed      | PostgreSQL + Prisma, migrations, type-safe queries |
 | 28  | JWT Authentication                        | ✅ Completed      | JWT + bcrypt auth; 15-min access tokens + rotating, hashed refresh tokens |
@@ -136,21 +138,21 @@ Whether you're a beginner solidifying fundamentals or an experienced engineer re
 | 52  | demo-52-redis-caching-advanced                    | 📋 Planned      | Advanced Redis caching & invalidation |
 | 53  | demo-53-rate-limiting-redis                       | 📋 Planned      | Distributed rate limiting with Redis |
 | 54  | demo-54-observability-prometheus                  | 📋 Planned      | Prometheus metrics & monitoring |
-| 55  | demo-55-structured-logging-correlation            | 📋 Planned      | Request correlation IDs in logs |
-| 56  | demo-56-security-helmet-csp                       | 📋 Planned      | Helmet security headers & CSP |
+| 55  | demo-55-trace-context-propagation                 | 📋 Planned      | Distributed trace-context propagation (W3C traceparent) across microservices |
+| 56  | demo-56-strict-csp-security-txt                   | 📋 Planned      | Strict CSP with Swagger UI support, security.txt (RFC 9116), security header suite |
 | 57  | demo-57-input-sanitization-xss                    | 📋 Planned      | Advanced input sanitization & XSS protection |
-| 58  | demo-58-async-queues-bullmq                       | 📋 Planned      | Background jobs with BullMQ + Redis |
-| 59  | demo-59-database-transactions                     | 📋 Planned      | Advanced transaction patterns |
+| 58  | demo-58-repeatable-jobs-flows                     | 📋 Planned      | Repeatable & scheduled BullMQ jobs, parent-child job flows, rate-limited queues |
+| 59  | demo-59-saga-transactional-outbox                 | 📋 Planned      | Distributed transactions: Saga orchestrator + Transactional Outbox pattern |
 | 60  | demo-60-cqrs-simulation                           | 📋 Planned      | CQRS pattern simulation |
 | 61  | demo-61-microservices-rest-comms                  | 📋 Planned      | Inter-service communication |
 | 62  | demo-62-contract-testing                          | 📋 Planned      | Contract testing with Pact |
 | 63  | demo-63-performance-profiling                     | 📋 Planned      | API performance profiling |
-| 64  | demo-64-feature-flags                             | 📋 Planned      | Feature flag implementation |
-| 65  | demo-65-advanced-versioning-headers               | 📋 Planned      | Header-based versioning & content negotiation |
-| 66  | demo-66-openapi-generation                        | 📋 Planned      | OpenAPI spec-driven development |
+| 64  | demo-64-gradual-rollouts-flags                    | 📋 Planned      | Dynamic feature flags: percentage rollouts, user targeting, emergency kill switches |
+| 65  | demo-65-content-negotiation-versioning            | 📋 Planned      | Content negotiation (`Accept: application/vnd...`) versioning vs URI versioning |
+| 66  | demo-66-spectral-linting-breaking-changes         | 📋 Planned      | Automated API linting with Spectral and breaking-change detection in CI |
 | 67  | demo-67-server-sent-events-polling                | 📋 Planned      | Real-time updates with SSE |
 | 68  | demo-68-clean-architecture                        | 📋 Planned      | Clean Architecture (ports & adapters) |
-| 69  | demo-69-event-driven-webhooks-advanced            | 📋 Planned      | Advanced event-driven webhooks |
+| 69  | demo-69-outgoing-webhooks-delivery                | 📋 Planned      | Outbound webhook dispatcher: HMAC signing, retry backoff, delivery logs & dead-letters |
 | 70  | demo-70-multi-tenancy-basics                      | 📋 Planned      | Multi-tenancy data isolation |
 | 71  | demo-71-internationalization-i18n                 | 📋 Planned      | i18n support in responses |
 | 72  | demo-72-circuit-breaker-resilience                | 📋 Planned      | Circuit breaker pattern |
@@ -193,43 +195,49 @@ Whether you're a beginner solidifying fundamentals or an experienced engineer re
 | **Advanced**   | 51–75   | Scalability, Observability, Resilience Patterns | ⏳ Planned |
 | **Real-World** | 76–100  | Full Production Applications | ⏳ Planned |
 
-**Total Demos**: 100  
-Detailed per-demo docs → [docs/progress/](docs/progress/)
+**Total Demos**: 100 · **Completed**: 50  
+Detailed per-demo docs → [docs/progress/](docs/progress/) · Code-quality review, open issues and next steps → [assessment.md](assessment.md)
 ---
 
 ## Backend Tech Stack
 
-- **Runtime**: Node.js 20+ (22 recommended) with TypeScript
-- **Framework**: Express / Fastify (progressive adoption toward NestJS in advanced demos)
-- **ORM**: Prisma (primary) + Mongoose (some demos)
-- **Database**: PostgreSQL + MongoDB (learning both)
-- **Validation**: Zod
-- **Authentication**: JWT + bcrypt
-- **Caching**: Redis
-- **Messaging**: RabbitMQ / Apache Kafka (advanced demos)
-- **Documentation**: OpenAPI 3.1 generated from Zod schemas + Swagger UI
-- **Testing**: Jest + Supertest (mocked DB, coverage gates) + real-database smoke tests; Pact later (contract testing)
-- **Logging**: Winston (structured JSON logs, request IDs) via `@restful/shared`
-- **Observability**: OpenTelemetry, Prometheus, Grafana
-- **Containerization**: Docker + Docker Compose
-- **Background jobs**: BullMQ (advanced demos)
-- **Security**: helmet, CORS allow-list, rate limiting, Zod whitelisting, bcrypt, refresh-token rotation
+### In use (Days 1–50)
+
+- **Runtime**: Node.js 22+ with TypeScript 5
+- **Framework**: Express 4
+- **ORM / ODM**: Prisma 5 (PostgreSQL) + Mongoose (MongoDB, Day 26)
+- **Validation**: Zod — also the source of the OpenAPI documents
+- **Authentication**: JWT + bcrypt, rotating hashed refresh tokens, httpOnly cookie sessions with CSRF (Day 43)
+- **Caching**: Redis (Day 33)
+- **Background jobs**: BullMQ + Redis, Mailpit for local SMTP (Day 40)
+- **Object storage**: S3 API via the AWS SDK, SeaweedFS locally (Day 39)
+- **Documentation**: OpenAPI 3.1 + Swagger UI; spec-first contract with a generated typed client (Day 31)
+- **Testing**: Jest + Supertest, OpenAPI contract tests, coverage gates, Testcontainers (Day 45), real-infrastructure smoke tests
+- **Logging**: Winston via `@restful/shared` — JSON logs, request IDs, request context, secret redaction
+- **Containerization**: multi-stage non-root Docker image, Docker Compose, Caddy as a TLS reverse proxy (Day 46)
+- **Security**: helmet, CORS allow-list, per-IP + per-account rate limiting, Zod whitelisting, HMAC-signed webhooks
+
+### Planned (Days 51–100)
+
+- **Observability**: OpenTelemetry tracing, Prometheus metrics, Grafana dashboards
+- **Messaging**: RabbitMQ / Apache Kafka
+- **Frameworks**: a comparison with Fastify / NestJS; GraphQL vs REST (Day 74)
+- **Contract testing**: Pact (Day 62)
 
 ### Deployment Strategy
-- **Local**: Docker Compose (PostgreSQL + Redis + API)
-- **Staging**: Docker + GitHub Actions CI/CD
-- **Production**: Containerized deployment (Docker/Kubernetes ready), Blue-Green / Canary releases
-- **CI/CD**: GitHub Actions for linting, testing, building, and deployment
-- **Monitoring**: Prometheus + Grafana dashboards + OpenTelemetry tracing
+
+- **Local (today)**: Docker Compose per demo — the database plus whatever the demo needs (Redis, S3, Mailpit); Day 46 runs the full stack with a migrate job and Caddy
+- **CI/CD (today)**: GitHub Actions — audit, type-check, lint, formatting, tests with coverage, real-infrastructure smoke tests, and a Docker job that publishes the Day 46 image to GitHub Container Registry from `main`
+- **Planned**: staging and production deployments (Kubernetes-ready, blue-green / canary) and Prometheus + Grafana + OpenTelemetry monitoring in the advanced and real-world phases
 
 ---
 ## Getting Started
 
 ### Prerequisites
-- Node.js 20 or higher (`nvm use` picks up `.nvmrc` → 22)
+- Node.js 22 or higher (`nvm use` picks up `.nvmrc`; Node 20 reached end-of-life in April 2026)
 - pnpm 9 (`corepack enable` installs the version pinned in `package.json`)
 - Docker & Docker Compose (strongly recommended)
-- PostgreSQL (optional if using Docker)
+- PostgreSQL, MongoDB, Redis, S3 storage and an SMTP catcher are only needed for the days that use them; each demo's `docker-compose.yml` starts them
 
 ### Setup & Installation
 
@@ -252,10 +260,17 @@ Detailed per-demo docs → [docs/progress/](docs/progress/)
 
 4. **Start the database and run a demo**
    ```bash
-   docker compose up -d     # Postgres for this demo (credentials come from .env)
+   docker compose up -d     # this demo's services (credentials come from .env)
    pnpm prisma:migrate      # apply migrations (Prisma demos)
-   pnpm dev                 # Day 29 API docs: http://localhost:3028/api/docs
+   pnpm dev                 # Day 29 API docs: http://localhost:3028/api/docs (port comes from .env)
                             # every demo: /health (liveness) and /ready (database check)
+   ```
+
+   Services by day: MongoDB (26), PostgreSQL (27–50 except 30, 34, 40, 42, 44, 47, 49), Redis (33, 40), S3-compatible storage (39), Mailpit SMTP (40). Day 46 runs the whole stack in containers: `docker compose up --build --wait`.
+
+   ```bash
+   # Day 40 also needs its worker in a second terminal
+   pnpm worker
    ```
 
 5. **Workspace checks** (run from the repo root — the same steps as CI)
@@ -273,7 +288,7 @@ Detailed per-demo docs → [docs/progress/](docs/progress/)
 ### Starting a New Day
 
 ```bash
-pnpm new-day 50 database_transactions "Database Transactions"   # copies demos/_template, renames everything
+pnpm new-day 51 hateoas_links "HATEOAS Links" advanced   # copies demos/_template, renames everything
 pnpm install
 ```
 
@@ -287,8 +302,8 @@ Detailed per-day notes are in `docs/progress/day_XX_reflection.md`. Architecture
 - **Pure REST-focused learning path** — No frontend bloat, 100% focused on RESTful API design patterns
 - **pnpm workspace monorepo** — One install, one lockfile, and a `demos/_template` to start each day from
 - **Reusable `@restful/shared` package** — Response envelope, error handling, validation and typed auth context shared by the intermediate+ demos
-- **Production-grade patterns implemented step-by-step** — Idempotency, HATEOAS, soft delete, versioning, RBAC, caching, observability, and more
-- **CI on every push** — dependency audit, type-check, lint, formatting, tests with coverage gates, OpenAPI contract tests, and a real-database smoke test
+- **Production-grade patterns implemented step-by-step** — so far: idempotency, soft delete, versioning, RBAC, caching, queues, webhooks, transactions and optimistic locking; HATEOAS, observability and resilience come in the advanced phase
+- **CI on every pull request and every push to `main`** — dependency audit, type-check, lint, formatting, tests with coverage gates, OpenAPI contract tests, and a real-database smoke test
 - **Progressive learning journey** — Beginner → Intermediate → Advanced → Real-World production applications
 - **Comprehensive documentation** — Daily progress logs, OpenAPI specs, and architecture decisions
 - **Living Portfolio** — A complete showcase of RESTful API design mastery
