@@ -40,7 +40,7 @@ app.get('/api/proxy-info', (req: Request, res: Response) => {
     ip: req.ip,
     ips: req.ips,
     host: req.get('host'),
-    forwardedProto: req.get('x-forwarded-proto') ?? null,
+    forwardedProto: req.get('x-forwarded-proto') || null,
   });
 });
 

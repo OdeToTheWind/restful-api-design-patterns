@@ -84,6 +84,10 @@ describe('app-level middleware', () => {
     expect(res.body.secure).toBe(true);
     expect(res.body.ip).toBe('203.0.113.195');
     expect(res.body.forwardedProto).toBe('https');
+
+    const directRes = await request(app).get('/api/proxy-info');
+    expect(directRes.status).toBe(200);
+    expect(directRes.body.forwardedProto).toBeNull();
   });
 });
 
